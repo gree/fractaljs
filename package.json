@@ -1,0 +1,8 @@
+{
+  "name": "httpserver",
+  "version": "0.0.0",
+  "dependencies": {
+    "express": "*"
+  },
+  "engine": ">=0.10"
+}
