@@ -8,7 +8,6 @@ app.configure(function () {
   app.use(express.bodyParser());
   app.use(express.cookieParser());
   app.use(app.router);
-  // app.use(express.static(__dirname + '/../gui'));
   app.use(express.static(__dirname));
   app.use(express.directory(__dirname));
 });

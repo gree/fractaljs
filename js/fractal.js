@@ -45,55 +45,23 @@
 
   var Component = Class.extend({
     // constructor
-    init: function(name, $container, root){
+    init: function(name, $container){
       var self = this;
       self.name = name;
       self.$container = $container;
-      self.root = root || this;
 
       self.data = {};
       self.scripts = {};
       self.requireListeners = {};
     },
-    // private
-    iterate: function(callback, loadMyself) {
-      var self = this;
-
-      var __loadComponents = function(){
-        var $components = self.$container.find('[data-role=component]');
-        if ($components.length == 0 && callback) callback();
-        var finished = 0;
-        $components.each(function(){
-          var name = $(this).data("name");
-          if (name) {
-            Fractal.loadComponent(name, $(this), function(){
-              finished++;
-              if (finished == $components.length && callback) {
-                callback();
-              }
-            })
-          } else {
-            console.log("data-name attribute not found:", this);
-          }
-        });
-      };
-
-      if (loadMyself === false) {
-        __loadComponents();
-      } else {
-        self.loadMyself(function(){
-          __loadComponents();
-        });
-      }
-    },
     // public / protected
     getData: function(callback) { setTimeout( function(){ callback({}); }, 0 ); },
     generate: function(data) {
       // TODO client-side EJS seems not promising, move to Hogan ??
-      var template = this.template || Fractal.getTemplate(this.name);
+      var template = this.template || window.Fractal.getTemplate(this.name);
       return new EJS({url: template}).render(data);
     },
-    loadMyself: function(callback) {
+    load: function(callback) {
       var self = this;
       self.getData(function(data){
         var view = self.generate(data);
@@ -101,77 +69,114 @@
         if (self.afterRender) self.afterRender();
         if (callback) callback();
       });
-    },
-    updateMyself: function(data, callback){
-      var view = self.generate(data);
-      self.$container.html(view);
-      if (self.afterRender) self.afterRender();
-      if (callback) callback();
     }
   });
 
-  var ROOT_NAME = "__root__";
-  var Fractal = {
-    components: {},
-    root: null,
-    data: {},
-    requireListeners: {},
-    Component: Component
+  var Fractal = function() {
+    this.components = {};
+
+    this.prefix = {
+      components: "/components/",
+      templates: "/templates/",
+      json: "/api/get/",
+      scripts: "/scripts/",
+    };
+
+    this.data = {};
+    this.requireListeners = {};
+
+    this.Component = Component;
   };
 
-  Fractal.getTemplate = function(name) {
+  var proto = Fractal.prototype;
+
+  proto.getTemplate = function(name) {
     var $template = $('script[type="text/template"][id="' + name + '"]');
     if ($template.length > 0) {
       return $template.html();
     } else {
-      return isAbs(name) ? name : "/templates/" +name + ".ejs";
+      return this.prefix.templates + name + ".ejs";
     }
   };
-  Fractal.getComponentJS = function(name) { return "/components/" + name + ".js"; };
-  Fractal.getJSONUrl = function(name) { return "/api/get/" + name; };
-  Fractal.getScriptUrl = function(name) { return "" + name; }
+  proto.getComponentJS = function(name) { return this.prefix.components + name + ".js"; };
+  proto.getJSONUrl = function(name) { return this.prefix.json + name; };
+  proto.getScriptUrl = function(name) { return this.prefix.script + name; }
 
-  Fractal.construct = function($container, getenv, callback) {
-    if (typeof $container == "function") {
-      if (!getenv) {
-        callback = $container;
-        getenv = null;
-      } else {
-        callback = getenv;
-        getenv = $container;        
-      }
-      $container = null;
+  proto.setOpts = function(opts) {
+    for (var i in this.prefix) {
+      if (i in opts) this.prefix[i] = opts[i];
     }
-    if (getenv) this.env = getenv();
-    $container = $container || $(document);
-    this.root = new Component(ROOT_NAME, $container);
-    this.root.iterate(callback, false);
   };
 
-  Fractal.loadComponent = function(name, $container, callback) {
+  // Fractal.iterate(name, $container, callback);
+  // Fractal.iterate($container, callback); // name: null
+  // Fractal.iterate(callback); // name: null, $container: $document
+  proto.iterate = function(name, $container, callback) {
     var self = this;
-    var __init_component = function() {
-      var component = new window[name](name, $container, self.root);
-      self.components[name] = component;
-      component.iterate(callback);
+    if (typeof(name) != "string") {
+      if (typeof(name) == "function") {
+        callback = name;
+        $container = $(document);
+        name = null;
+      } else {
+        callback = $container;
+        $container = name;
+        name = null;
+      }
+    }
+
+    var __loadComponents = function(){
+      $subComponents = $container.find('[data-role=component]');
+      var len = $subComponents.length;
+      if (len == 0) {
+        if (callback) callback();
+      } else {
+        var finished = 0;
+        $subComponents.each(function(){
+          self.iterate($(this), function(){
+            finished++;
+            if (finished == len && callback) callback();
+          });
+        });
+      }
     };
 
-    if (name in window) {
-      __init_component();
-    } else {
-      var js = self.getComponentJS(name);
-      self.require(js, function(){
-        if (!(name in window)) {
-          console.log("Component not found: " + name);
-          callback(null);
-        } else {
-          __init_component();
-        }
-      });
-    }    
-  }
+    var __loadComponent = function(componentName, componentLoaded){
 
-  Fractal.require = function(resourceList, callback) {
+      var __initComponent = function() {
+        var component = new window[componentName](componentName, $container);
+        self.components[componentName] = component;
+        component.load(componentLoaded);
+      };
+
+      if (componentName in window) {
+        __initComponent();
+      } else {
+        var js = self.getComponentJS(componentName);
+        self.require(js, function(){
+          if (!(componentName in window)) {
+            console.log("Component not found: " + componentName);
+            componentLoaded(null);
+          } else {
+            __initComponent();
+          }
+        });
+      }    
+    };
+
+    var name = name || $container.data("name");
+    if (name) { // load myself first
+      __loadComponent(name, function() {
+        //self.publish("loaded.component", name);
+        __loadComponents();
+      });
+    } else {
+      __loadComponents();
+    }
+
+  };
+
+  proto.require = function(resourceList, callback) {
     if (typeof resourceList == "string") resourceList = [resourceList];
     if (resourceList.length == 0) {
       if (callback) callback();
@@ -194,10 +199,10 @@
         self.data[resource] = false;
         var ext = resource.split('.').pop();
         if (ext == "js") {
-          resource = isAbs(resource) ? resource : self.getScriptUrl(resource);
-          getScript(resource, function(){
-            console.log("require script", resource);
-            self.data[resource] = true;
+          var url = isAbs(resource) ? resource : self.getScriptUrl(resource);
+          getScript(url, function(success){
+            console.log("require script", resource, success);
+            self.data[resource] = {loaded: success};
             if (resource in self.requireListeners){
               for (var i in self.requireListeners[resource]) {
                 self.requireListeners[resource][i].resolve();
@@ -206,9 +211,9 @@
             }
             return d.resolve();
           });
-        } else if (ext == resource) {
-          resource = isAbs(resource) ? resource : self.getJSONUrl(resource);
-          getJSON(resource, function(data){
+        } else if (ext == resource || ext == "json") {
+          var url = isAbs(resource) ? resource : self.getJSONUrl(resource);
+          getJSON(url, function(data){
             console.log("require JSON", resource);
             self.data[resource] = data;
             if (resource in self.requireListeners){
@@ -243,17 +248,21 @@
   };
 
   var getScript = function(url, callback) {
+    var __myTimer = setTimeout(function(){
+      callback(false); // require failed
+    }, 1000);
+
     var head = document.getElementsByTagName("body")[0];
     var el = document.createElement("script");
     el.src = url;
     {
       var done = false;
-
       el.onload = el.onreadystatechange = function(){
         if ( !done && (!this.readyState ||
           this.readyState == "loaded" || this.readyState == "complete") ) {
           done = true;
-          if (callback) callback();
+          clearTimeout(__myTimer);
+          if (callback) callback(true);
           el.onload = el.onreadystatechange = null;
         }
       };
@@ -275,9 +284,17 @@
     xhr.send("");
   };
 
-  this.Fractal = Fractal;
+  if (typeof define === 'function' && define.amd) {
+    define(function () {
+      return new Fractal();
+    });
+  }
+  else if (typeof module === 'object' && module.exports){
+    module.exports = new Fractal();
+  }
+  else {
+    this.Fractal = new Fractal();
+  }
 
-})();
-
-
+}.call(this));
 
