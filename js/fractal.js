@@ -86,6 +86,12 @@
     this.requireListeners = {};
 
     this.Component = Component;
+
+    this.TOPIC = { // TODO should be TOPIC_"PREFIX"
+      LOADED: "fractal.loaded",
+      DATA_UPDATED: "data.updated",
+    };
+
   };
 
   var proto = Fractal.prototype;
@@ -135,7 +141,10 @@
         $subComponents.each(function(){
           self.iterate($(this), function(){
             finished++;
-            if (finished == len && callback) callback();
+            if (finished == len) {
+              self.publish(self.TOPIC.LOADED, {type: "Sub Components", name: name});
+              if (callback) callback();
+            }
           });
         });
       }
@@ -167,7 +176,7 @@
     var name = name || $container.data("name");
     if (name) { // load myself first
       __loadComponent(name, function() {
-        //self.publish("loaded.component", name);
+        self.publish(self.TOPIC.LOADED, {type: "Myself", name: name});
         __loadComponents();
       });
     } else {
@@ -176,7 +185,27 @@
 
   };
 
-  proto.require = function(resourceList, callback) {
+  // wrapper for pubsubjs
+  // TODO pubsub feature is necessary, see if this is the best solution.
+  proto.publish = function(topic, data) {
+    PubSub.publish(topic, data);
+  };
+
+  proto.subscribe = function(topic, handler) {
+    var token = PubSub.subscribe(topic, handler);
+  };
+
+  proto.unsubscribe = function(token) {
+    PubSub.unsubscribe(token);
+  };
+
+  proto.updateData = function(name, data) {
+    var self = this;
+    self.data[name] = data;
+    self.publish(self.TOPIC.DATA_UPDATED, name);
+  };
+
+  proto.require = function(resourceList, callback, forcedRefresh) {
     if (typeof resourceList == "string") resourceList = [resourceList];
     if (resourceList.length == 0) {
       if (callback) callback();
@@ -186,7 +215,7 @@
     var self = this;
     var __get = function(resource) {
       var d = new $.Deferred();
-      if (resource in self.data) {
+      if (resource in self.data && !forcedRefresh) {
         if (self.data[resource]) {
           return d.resolve();
         } else {
@@ -215,7 +244,7 @@
           var url = isAbs(resource) ? resource : self.getJSONUrl(resource);
           getJSON(url, function(data){
             console.log("require JSON", resource);
-            self.data[resource] = data;
+            self.updateData(resource, data);
             if (resource in self.requireListeners){
               for (var i in self.requireListeners[resource]) {
                 self.requireListeners[resource][i].resolve();

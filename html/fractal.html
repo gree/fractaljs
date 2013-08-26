@@ -11,14 +11,20 @@
     <div class="container">
 
       <div class="page-header">
-        Fractal
+        <h1>Fractal</h1>
       </div>
 
       <h3>Bacis</h3>
+      <p><i>simple example to show how are components loaded</i></p>
     <div data-role="component" data-name="basic"></div>
 
       <h3>Dynamic Load</h3>
+      <p><i>load components on different conditions</i></p>
     <div data-role="component" data-name="dynamic_load"></div>
+
+      <h3>Shared Data</h3>
+      <p><i>display the same data with "Basic"</i></p>
+    <div data-role="component" data-name="shared_data"></div>
 <!--
       <h3>nested</h3>
     <div data-role="component" data-name="fractal_2_iterations"></div>
@@ -30,6 +36,7 @@
     <script src="http://code.jquery.com/jquery.js"></script>
     <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
     <script src="contrib/ejs.js"></script>
+    <script src="contrib/pubsub.js"></script>
     <script src="../js/fractal.js"></script>
     <script>
 
@@ -41,6 +48,15 @@ $(function(){
     json: "/html/fractal/",
     script: "/html/fractal/",
   });
+
+  var globalListener = function(msg, data){
+    console.log("[GLOBAL LISTENER]", msg, data);
+  }
+
+  // just for testing
+  // Fractal.subscribe(Fractal.TOPIC.LOADED, globalListener);
+  // Fractal.subscribe(Fractal.TOPIC.DATA_UPDATED, globalListener);
+
   Fractal.iterate(function(){
     console.log("all loaded");
   });
