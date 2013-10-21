@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-theme.min.css">
+  </head>
+  <body>
+
+    <div class="container">
+
+      <div class="page-header">
+        <h1>iFrame Tester</h1>
+      </div>
+
+      <input type="text" id="tester-loadsrc" value="http://localhost:4000/" />
+      <button class="btn" id="tester-load">Load</button>
+      <br />
+
+      <iframe id="tester-target" width="1024" height="768"></iframe>
+    </div>
+
+    <script src="http://code.jquery.com/jquery.js"></script>
+    <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+    <script>
+
+$(function(){
+
+  $('#tester-load').click(function(){
+    $('#tester-target').attr("src", $('#tester-loadsrc').val());
+    $('#tester-target').ready(function(){
+      $('#tester-target').contents().ready(function(){
+        var $target = $('#tester-target').contents();
+        setTimeout(function(){
+          $target.find('#nav-config').trigger("click");
+        }, 1000);
+      });
+    });
+
+  });
+
+
+});
+
+    </script>
+  </body>
+</html>
+

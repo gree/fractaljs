@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css">
+    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-theme.min.css">
+    <style>
+      body.modal-open {
+        margin-right: 0!important;
+        overflow: hidden;
+      }    </style>
+  </head>
+  <body>
+
+<div class="container">
+
+<div class="page-header">
+  <h1>Fractal</h1>
+</div>
+
+<h3>Bacis</h3>
+<p><i>simple example to show how are components loaded</i></p>
+<div data-role="component" data-name="basic"></div>
+
+<h3>Dynamic Load</h3>
+<p><i>load components on different conditions</i></p>
+<div data-role="component" data-name="dynamic_load"></div>
+
+</div><!-- container -->
+
+<script src="http://code.jquery.com/jquery.js"></script>
+<script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+<script src="contrib/ejs.js"></script>
+<script src="contrib/pubsub.js"></script>
+<script src="../js/fractal.js"></script>
+<script>
+
+var DEMO = {};
+DEMO.env = {};
+
+$(function(){
+
+  function getParameter() {
+    var match,
+        pl     = /\+/g,  // Regex for replacing addition symbol with a space
+        search = /([^&=]+)=?([^&]*)/g,
+        decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+        query  = window.location.search.substring(1);
+    // decode
+    urlParams = {};
+    while (match = search.exec(query)) {
+      if (!match[2]) {
+        urlParams["page"] = decode(match[1]);
+      } else {
+        urlParams[decode(match[1])] = decode(match[2]);
+      }
+    }
+    // special checks
+    if (!urlParams["page"]) {
+      urlParams["page"] = "index";
+    }
+    return urlParams;
+  }
+
+  DEMO.env = getParameter();
+
+  Fractal.PREFIX = {
+    component: "/html/fractal/",
+    template: "/html/fractal/",
+    json: "/html/fractal/",
+    script: "/html/fractal/",
+  };
+
+  var globalListener = function(msg, data){
+    console.log("[GLOBAL LISTENER]", msg, data.name);
+  }
+  Fractal.subscribe(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, globalListener);
+
+  Fractal.construct(function(){
+    console.log("all loaded");
+  });
+
+});
+
+    </script>
+  </body>
+</html>
+
