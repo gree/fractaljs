@@ -12,6 +12,7 @@
   Fractal.PREFIX = {
     component: "/components/",
     template: "/templates/",
+    css: "/css/",
     json: "/api/",
     scripts: "/scripts/",
   };
@@ -20,19 +21,30 @@
     var dataCache = {};
     var listeners = [];
 
-    var isAbs = function(url) {
-      return (url.indexOf("/") == 0 || url.indexOf(".") == 0 || url.indexOf("http://") == 0);
+    var createElementHandlers = {
+      "js": function(url) {
+        var src = isAbs(url) ? url : getScriptUrl(url);
+        var el = document.createElement("script");
+        el.src = src;
+        return el;
+      },
+      "css": function(url) {
+        var href = isAbs(url) ? url : getCSSUrl(url);
+        var el = document.createElement("link");
+        el.rel="stylesheet";
+        el.href = href;
+        return el;
+      }
     };
 
-    var getScript = function(url, callback) {
+    var addElement = function(url, ext, callback) {
       var __myTimer = setTimeout(function(){
         console.error("Timeout: getting script", url);
         callback(false); // require failed
-      }, 30000);
+      }, 10000);
 
-      var head = document.getElementsByTagName("body")[0];
-      var el = document.createElement("script");
-      el.src = url;
+      var container = document.getElementsByTagName("head")[0];
+      var el = createElementHandlers[ext](url);
       {
         var done = false;
         el.onload = el.onreadystatechange = function(){
@@ -45,16 +57,11 @@
           }
         };
       }
-
-      head.appendChild(el);
+      container.appendChild(el);
     };
 
-    var updateData = function(name, data) {
-      dataCache[name] = data;
-      Fractal.publish(Fractal.TOPIC.DATA_UPDATED, name);
-    };
-
-    var getJSON = function(path, callback) {
+    var getJSON = function(url, callback) {
+      var path = isAbs(url) ? url : getJSONUrl(url);
       var xhr = new XMLHttpRequest();
       xhr.open("GET", path, true);
       xhr.onreadystatechange = function () {
@@ -67,9 +74,34 @@
       xhr.send("");
     };
 
+    var isAbs = function(url) {
+      return (url.indexOf("/") == 0 || url.indexOf(".") == 0 || url.indexOf("http") == 0);
+    };
     var getScriptUrl = function(name) { return Fractal.PREFIX.script + name; }
+    var getCSSUrl = function(name) { return Fractal.PREFIX.css + name; }
     var getJSONUrl = function(name) { return Fractal.PREFIX.json + name; };
 
+    var updateData = function(name, data) {
+      dataCache[name] = data;
+      Fractal.publish(Fractal.TOPIC.DATA_UPDATED, name);
+    };
+
+    var getResource = function(resourceId, callback) {
+      dataCache[resourceId] = false;
+      var ext = resourceId.split('.').pop();
+      if (ext == "js" || ext == "css") {
+        addElement(resourceId, ext, function(success){
+          callback({loaded: success});
+        });
+      } else if (ext == resourceId || ext == "json") {
+        getJSON(resourceId, function(data){
+          callback(data);
+        });
+      } else {
+        console.warning("nothing to do with: " + resourceId);
+        callback(null);
+      }
+    };
 
     // Synchronically require external data (script or JSON data)
     // "resourceList" is the Array of URLs
@@ -83,6 +115,7 @@
       }
 
       var resourceUpdated = {};
+      var retData = {};
       var __get = function(resource) {
         var d = new $.Deferred();
         if (resource in dataCache && !forcedRefresh) {
@@ -96,38 +129,20 @@
           }
         } else {
           dataCache[resource] = false;
-          var ext = resource.split('.').pop();
-          if (ext == "js") {
-            var url = isAbs(resource) ? resource : getScriptUrl(resource);
-            getScript(url, function(success){
-              console.debug("require script", resource, success);
-              dataCache[resource] = {loaded: success};
-              if (resource in listeners){
-                for (var i in listeners[resource]) {
-                  listeners[resource][i].resolve();
-                }
-                delete listeners[resource];
-              }
-              return d.resolve();
-            });
-          } else if (ext == resource || ext == "json") {
-            var url = isAbs(resource) ? resource : getJSONUrl(resource);
-            getJSON(url, function(data){
-              console.debug("require JSON", resource);
+          getResource(resource, function(data){
+            if (data) {
+              console.debug("require " + resource);
               updateData(resource, data);
               resourceUpdated[resource] = data;
-              if (resource in listeners){
-                for (var i in listeners[resource]) {
-                  listeners[resource][i].resolve();
-                }
-                delete listeners[resource];
+            }
+            if (resource in listeners){
+              for (var i in listeners[resource]) {
+                listeners[resource][i].resolve();
               }
-              return d.resolve();
-            });
-          } else {
-            console.log("nothing to do with:", resource, ext);
+              delete listeners[resource];
+            }
             return d.resolve();
-          }
+          });
           return d.promise();
         }
       };
@@ -140,11 +155,12 @@
         if (!$.isEmptyObject(resourceUpdated)) {
           Fractal.publish(Fractal.TOPIC.DATASET_UPDATED, resourceUpdated);
         }
-        if (callback) callback(resourceUpdated);
+        if (callback) callback(dataCache);
       });
     }
   })();
 
+  Fractal.components = {};
   Fractal.Component = (function(){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
@@ -200,7 +216,7 @@
     };
     var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
 
-    var components = {};
+    var components = Fractal.components;
 
     return Class.extend({
       // constructor
@@ -209,7 +225,7 @@
         self.name = name;
         self.$container = $container;
         self.rendered = false;
-
+        self.lazyLoad = false;
         // // TODO implement if needed
         // self.children = [];
         // self.parent = null;
@@ -318,6 +334,15 @@
   Fractal.unsubscribe = function(token) {
     PubSub.unsubscribe(token);
   };
+
+  Fractal.platform = (function(){
+    var isAndroid = !!(navigator.userAgent.match(/Android/i));
+    var isIOS     = !!(navigator.userAgent.match(/iPhone|iPad|iPod/i));
+
+    if (isAndroid) return "android";
+    else if (isIOS) return "ios";
+    else return "www";
+  })();
 
   if (typeof define === 'function' && define.amd) {
     define(function () {
