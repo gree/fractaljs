@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css">
+<style>
+.box-gr {
+  white-space-collapse: discard;
+  line-height: 0;
+  font-size: 0;  
+  display: inline-block;
+  position: relative;
+}
+.box-gr-root {
+  width: 809px;
+  height: 500px;
+  border: 1px solid;
+}
+.box-gr-spliter {
+  border: 0;
+  background-color: #000000;
+}
+.box-gr-holder {
+  border: 0;
+}
+</style>
+</head>
+<body>
+
+<div class="box-gr box-gr-root">
+  <div data-role="component" data-name="golden_ratio"></div>
+</div>
+
+<div class="box-gr box-gr-root">
+  <div data-role="component" data-name="golden_ratio"></div>
+</div>
+
+<br/>
+
+<div class="box-gr box-gr-root">
+  <div data-role="component" data-name="golden_ratio"></div>
+</div>
+
+<div class="box-gr box-gr-root">
+  <div data-role="component" data-name="golden_ratio"></div>
+</div>
+
+
+<script src="http://code.jquery.com/jquery.js"></script>
+<script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+<script src="contrib/hogan.js"></script>
+<script src="contrib/pubsub.js"></script>
+<script src="../js/fractal.js"></script>
+<script>
+
+var DEMO = {};
+DEMO.env = {};
+
+$(function(){
+
+  Fractal.PREFIX = {
+    component: "/html/fractal/",
+    template: "/html/fractal/",
+    json: "/html/fractal/",
+    script: "/html/fractal/",
+  };
+
+  var globalListener = function(msg, data){
+    console.log("[GLOBAL LISTENER]", msg, data.name);
+  }
+  Fractal.subscribe(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, globalListener);
+
+  Fractal.construct(function(){
+    console.log("all loaded");
+  });
+
+});
+
+    </script>
+  </body>
+</html>
+
