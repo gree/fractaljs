@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test</title>
+</head>
+<body>
+
+<div id="message">display messages here ...</div>
+<button id="btn-get">GET MESSAGE</button>
+
+<script src="jquery.js"></script>
+<script>
+
+$(function(){
+  $('#btn-get').click(function() {
+    $.ajax({
+      url: 'hello.json',
+      dataType: 'json',
+      success: function(data){
+        console.log(data);
+        $('#message').text(data.message);
+      },
+      error: function(err){
+        console.error("ajax error", err);
+      }
+    });
+  });
+});
+
+</script>
+
+</body>
+</html>
+
