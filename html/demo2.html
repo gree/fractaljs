@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1,maximum-scale=1, user-scalable=no">
+  <title>Fractal Demo 1</title>
+  <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css">
+</head>
+<body>
+
+<div class="container">
+  <!-- <div data-role="component" data-name="backbone_todo"></div> -->
+  <div data-role="component" data-name="knockout_todo"></div>
+  <div data-role="component" data-name="angular_todo"></div>
+</div>
+
+<script src="http://code.jquery.com/jquery.js"></script>
+<script src="/js/contrib/hogan.js"></script>
+<script src="/js/fractal.js"></script>
+<script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+<script>
+$(function(){
+  Fractal.PREFIX = {
+    component: "/html/components/",
+    template: "/html/templates/",
+    json: "/json/",
+  };
+  Fractal.construct();
+});
+</script>
+</body>
+</html>

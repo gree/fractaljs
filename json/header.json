@@ -1,0 +1,13 @@
+{
+  "brand": "Demo1",
+  "menu_list": [
+    {
+      "link": "link1",
+      "name": "menu1"
+    },
+    {
+      "link": "link2",
+      "name": "menu2"
+    }
+  ]
+}

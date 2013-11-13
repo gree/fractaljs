@@ -17,9 +17,13 @@ var golden_ratio = (function(){
 
   return Fractal.Component.extend({
     getData: function(callback) {
+      var self = this;
       var stop = checkStop(this);
       console.log(stop);
       if (stop) {
+        self.data = {
+          stop: true
+        };
         callback({stop: true});
         return;
       }
@@ -29,6 +33,9 @@ var golden_ratio = (function(){
       var parentHeight = parent.height();
 
       if (parentHeight == parentWidth) {
+        self.data = {
+          stop: true
+        };
         callback({stop: true});
         return;        
       }
@@ -53,9 +60,10 @@ var golden_ratio = (function(){
         };
       }
       data.stop = false;
+      self.data = data;
       setTimeout(function(){
-        callback(data);
-      }, 0);
+        callback();
+      }, 500);
     }
   });
 

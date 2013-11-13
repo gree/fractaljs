@@ -1,4 +1,4 @@
-var getSharedData = function(){
+var __get_some_data = function(){
   var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   var text = "";
   for( var i=0; i<64; i++ )
@@ -11,18 +11,23 @@ var getSharedData = function(){
   };
 };
 
-var basic = Fractal.Component.extend({
+var contents = Fractal.Component.extend({
   afterRender: function(callback) {
     var self = this;
-    if (callback) callback();
+    $('#btn-basic').click(function(){
+      alert(JSON.stringify(self.fromServer));
+    });
+    callback();
   },
   getData: function(callback) {
-    Fractal.require("static.json", function(data) {
-      var viewData = {
-        shared: getSharedData(),
-        static: data["static.json"]
-      }
-      callback(viewData);
+    var self = this;
+    Fractal.require("basic.json", function(data) {
+      self.fromServer = data["basic.json"];
+      self.data = {
+        data: __get_some_data(),
+        from_server: self.fromServer
+      };
+      callback();
     });
   }
 });

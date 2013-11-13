@@ -13,8 +13,8 @@
   position: relative;
 }
 .box-gr-root {
-  width: 809px;
-  height: 500px;
+  width: 670px;
+  height: 414px;
   border: 1px solid;
 }
 .box-gr-spliter {
@@ -46,12 +46,10 @@
   <div data-role="component" data-name="golden_ratio"></div>
 </div>
 
-
 <script src="http://code.jquery.com/jquery.js"></script>
 <script src="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
-<script src="contrib/hogan.js"></script>
-<script src="contrib/pubsub.js"></script>
-<script src="../js/fractal.js"></script>
+<script src="/js/contrib/hogan.js"></script>
+<script src="/js/fractal.js"></script>
 <script>
 
 var DEMO = {};
@@ -60,16 +58,14 @@ DEMO.env = {};
 $(function(){
 
   Fractal.PREFIX = {
-    component: "/html/fractal/",
-    template: "/html/fractal/",
-    json: "/html/fractal/",
-    script: "/html/fractal/",
+    component: "/html/components/",
+    template: "/html/templates/",
   };
 
   var globalListener = function(msg, data){
     console.log("[GLOBAL LISTENER]", msg, data.name);
   }
-  Fractal.subscribe(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, globalListener);
+  Fractal.Pubsub.subscribe(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, globalListener);
 
   Fractal.construct(function(){
     console.log("all loaded");

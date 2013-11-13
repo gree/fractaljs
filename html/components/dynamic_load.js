@@ -33,9 +33,10 @@
   var dynamic_load = Fractal.Component.extend({
     init: function(name, $container){
       var self = this;
-      self.userLogin = false;
       self._super(name, $container);
-      Fractal.subscribe("user.login", function(topic, login){
+
+      self.userLogin = false;
+      self.subscribe("user.login", function(topic, login){
         if (!self.rendered) return;
         if (login != self.userLogin) self.load();
       });
@@ -61,9 +62,8 @@
         doLogin(data, function(success){
           if (!success) {
             alert("user/pass is wrong");
-            // self.load();
           } else {
-            Fractal.publish("user.login", true);
+            self.publish("user.login", true);
           }
         });
         return false;
@@ -79,7 +79,7 @@
       var self = this;
       $("#signout").click(function(){
         doLogout(function(){
-          Fractal.publish("user.login", false);
+          self.publish("user.login", false);
         });
         return false;
       });

@@ -5,23 +5,49 @@
 </head>
 <body>
 
-<div id="message">display messages here ...</div>
-<button id="btn-get">GET MESSAGE</button>
+<div class="container"><header></header><div id="main" role="main"><div class="row"><a href="http://beketa.dev.gree.jp:3000/submit">Submit new article</a>
+</div>
+<div class="row"><h1>MonadBlog</h1>
+</div>
+<p></p>
+<div id="list"><div class="row"><p id="date">2013-11-08 05:25:38.693508 UTC</p>
+<h2 id="title">Hello</h2>
+<p id="text">Hello</p>
+</div>
+<div class="row"><p id="date">2013-11-08 00:49:47.749121 UTC</p>
+<h2 id="title">おはようございます(^_^)</h2>
+<p id="text">おはようございますo(^_^)o</p>
+</div>
+</div>
+<div class="row"><button class="btn" id="btn-more">More...</button>
+</div>
 
 <script src="jquery.js"></script>
 <script>
 
-$(function(){
-  $('#btn-get').click(function() {
+var API_ROOT = "http://beketa.dev.gree.jp:3000/";
+
+$(function() {
+  $('#btn-more').click(function() {
+    var list = $('#list');
+    var count = list.children().length;
+    if (count == 0) return;
+    var child = list.children().first();
     $.ajax({
-      url: 'hello.json',
+      url: API_ROOT + 'getMore?from=' + count,
+      type: 'GET',
       dataType: 'json',
-      success: function(data){
-        console.log(data);
-        $('#message').text(data.message);
+      success: function(articles) {
+        for (var i = 0; i < articles.length; i++) {
+          var article = articles[i];
+          var newChild = child.clone();
+          newChild.find('#date').text(article['date']);
+          newChild.find('#title').text(article['title']);
+          newChild.find('#text').text(article['text']);
+          list.append(newChild);
+        }
       },
-      error: function(err){
-        console.error("ajax error", err);
+      error: function(xmlHttpRequest, textStatus, errorThrown) {
       }
     });
   });
