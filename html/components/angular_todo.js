@@ -50,7 +50,7 @@ var angular_todo = (function(){
         if (!todo.done) $scope.todos.push(todo);
       });
     };
-  }
+  };
 
   return Fractal.Component.extend({
     afterRender: function(callback) {
