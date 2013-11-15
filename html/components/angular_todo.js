@@ -32,7 +32,7 @@ var angular_todo = (function(){
     $scope.hasDone = function() {
         return ($scope.todos.length != $scope.remaining());
     }    
-      
+
     $scope.itemText = function() {
         return ($scope.todos.length - $scope.remaining() > 1) ? "items" : "item";     
     };

@@ -347,7 +347,7 @@
     Component.__getTemplate = function(callback) {
       var self = this;
       var resourceId = self.template || self.name;
-      var $template = $('script[type="text/template"][id="' + resourceId + '"]');
+      var $template = $('script[type="text/template"][id="template-' + resourceId + '"]');
       if ($template.length > 0) {
         self.templateContents = $template.html();
         callback();
