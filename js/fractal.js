@@ -392,22 +392,22 @@
     };
 
     Component.getTemplateFunc = function(){
-      var self = this;
-      if (self.getData === NOP) {
-        return self.__getTemplate;
+      if (this.getData === NOP) {
+        return this.__getTemplate;
       } else {
-        return self.__getCompiledTemplate;
+        return this.__getCompiledTemplate;
       }
     };
     Component.getRenderFunc = function(){
-      var self = this;
-      if (self.getData === NOP) {
+      if (this.getData === NOP) {
         return function(callback) {
+          var self = this;
           self.$container.html(self.templateContents);
           callback();
         };
       } else {
         return function(callback){
+          var self = this;
           var html = self.compiledTemplate.render(self.data, self.partials);
           self.$container.html(html);
           callback();
@@ -415,9 +415,8 @@
       }
     };
     Component.finishLoad = function(callback){
-      var self = this;
-      self.rendered = true;
-      Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: self.name});
+      this.rendered = true;
+      Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
     };
     Component.loadChildren = function(callback){
