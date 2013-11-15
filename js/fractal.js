@@ -306,30 +306,39 @@
   Fractal.components = {};
   Fractal.Component = (function(){
     var NOP = null;
+    var compIdGen = 0;
+
     var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
-    var subscribeList = {};
 
     var setLoad = function(self, func) {
-      if (func === NOP) return;
-      if (!self.load) self.load = func.bind(self);
-      else {
-        var temp = self.load;
-        self.load = function(callback){
-          temp(function(){
-            func.bind(self, callback)();
-            // setTimeout(func.bind(self, callback), 0);
-          });
+      if (func && typeof(func) === "function") {
+        if (!self.load) self.load = func.bind(self);
+        else {
+          var temp = self.load;
+          self.load = function(callback){
+            temp(function(){
+              func.bind(self, callback)();
+            });
+          }
         }
+      }
+    };
+
+    var setUnload = function(self, func) {
+      if (func && typeof(func) === "function") {
+        self.$container.on("unload", func.bind(self));
       }
     };
 
     var Component = {};
     Component.init = function(name, $container){
       var self = this;
+      self._id = ++compIdGen;
+
       self.name = name;
       self.$container = $container;
       self.rendered = false;
-      self.lazyLoad = false;
+      self.subscribeList = {};
       // // TODO implement if needed
       // self.children = [];
       // self.parent = null;
@@ -340,10 +349,16 @@
       setLoad(self, self.afterRender);
       setLoad(self, self.finishLoad);
       setLoad(self, self.loadChildren);
+
+      setUnload(self, self.unload);
     };
 
     Component.getData = NOP;
     Component.afterRender = NOP;
+    Component.unload = function(){
+      this.unsubscribe();
+      delete Fractal.components[this._id];
+    };
     Component.__getTemplate = function(callback) {
       var self = this;
       var resourceId = self.template || self.name;
@@ -429,7 +444,8 @@
 
       var __initComponent = function(name, $container) {
         var component = new window[name](name, $container);
-        Fractal.components[name] = component;
+
+        Fractal.components[component._id] = component;
         component.load(function(name){
           return __onChildLoaded();
         });
@@ -462,11 +478,17 @@
     };
     Component.subscribe = function(topic, callback){
       var token = Fractal.Pubsub.subscribe(topic, callback);
-      subscribeList[topic] = token;
+      this.subscribeList[topic] = token;
     };
     Component.unsubscribe = function(topic) {
-      if (topic in subscribeList) {
-        Fractal.Pubsub.unsubscribe(topic, subscribeList[topic]);
+      if (!topic) {
+        for (var i in subscribeList) {
+          Fractal.Pubsub.unsubscribe(i, subscribeList[i]);
+        }
+      } else {
+        if (topic in subscribeList) {
+          Fractal.Pubsub.unsubscribe(topic, subscribeList[topic]);
+        }
       }
     };
 
