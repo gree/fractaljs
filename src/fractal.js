@@ -1,19 +1,14 @@
 (function(root){
+  __startup = [];
   var Fractal = function(callback){
     if (!callback || typeof(callback) !== "function") return;
     if (Fractal.__ready) return callback();
-    else {
-      if (!Fractal.__startup) Fractal.__startup = [];
-      Fractal.__startup.push(callback);
-    }
+    __startup.push(callback);
   };
   Fractal.ready =  function(){
-    Fractal.ready = null;
     Fractal.__ready = true;
-    if (Fractal.__startup) {
-      Fractal.__startup.forEach(function(v){ v(); });
-      Fractal.__startup = [];
-    }
+    __startup.forEach(function(v){ v(); });
+    __startup = [];
   };
   // Settings
   Fractal.API_ROOT = "/";
@@ -361,7 +356,6 @@
       });
     }
   };
-  Fractal.components = {};
   Fractal.Component = (function(){
     var ComponentFilter = '[data-role=component]';
     var NOP = null;
@@ -409,7 +403,11 @@
 
       if (!self.loadOnce) setUnload(self, self.unload);
     };
-    Component.setTemplate = function(name) { this.template = name; this.cachedTemplate = null; };
+    Component.setTemplate = function(name) {
+      this.templateName = name;
+      this.compiled = false;
+      this.template = null;
+    };
     Component.load = function(callback) {
       this.$contents = null;
       callback();
@@ -420,25 +418,28 @@
     Component.unload = function(){
       console.debug("unload component", this.name);
       this.unsubscribe();
-      delete Fractal.components[this._id];
     };
     Component.getTemplate = function(callback) {
       var self = this;
-      if (self.cachedTemplate) return callback();
-      Fractal.getTemplate(self.template || self.name, function(data){
-        if (self.getData !== NOP) data = Hogan.compile(data);
-        self.cachedTemplate = data;
+      if (self.template) {
+        if (!self.compiled) {
+          self.template = Hogan.compile(self.template);
+          self.compiled = true;
+        }
         callback();
-      });
+      } else {
+        Fractal.getTemplate(self.templateName || self.name, function(template){
+          self.template = template;
+          self.getTemplate(callback);
+        });
+      }
     };
     Component.getRenderFunc = function(){
       var self = this;
-      var __render = (self.getData === NOP) ?
-        function(){ return self.cachedTemplate; } :
-        function(){ return self.cachedTemplate.render(self.data, self.partials); };
+      var __render = function(){ return self.template.render(self.data, self.partials).trim(); };
       if (self.loadOnce) {
         return function(callback){
-          var $html = $($.parseHTML(__render().trim()));
+          var $html = $($.parseHTML(__render()));
           self.$container.replaceWith($html);
           self.$contents = $html;
           callback();
@@ -462,16 +463,13 @@
       if (!self.$contents) self.$contents = self.$container.contents();
       $subComponents = self.$contents.find(ComponentFilter).andSelf().filter(ComponentFilter);
       var len = $subComponents.length;
-
       if (len == 0) {
         Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_CHILDREN, {name: self.name});
         if (callback) callback();
         return;
       }
-
       // start to load children
       var finished = 0;
-
       var __onChildLoaded = function(err){
         if (err) {
           console.error("Failed to load component: " + err);
@@ -484,8 +482,6 @@
 
       var __initComponent = function(name, $container) {
         var component = new window[name](name, $container);
-
-        Fractal.components[component._id] = component;
         component.load(function(name){
           return __onChildLoaded();
         });
@@ -517,10 +513,7 @@
     };
     Component.subscribe = function(topic, callback){
       var self = this;
-      var token = Fractal.Pubsub.subscribe(topic, function(topic, data){
-        console.debug("subscriber:", self.name, topic);
-        callback(topic, data);
-      });
+      var token = Fractal.Pubsub.subscribe(topic, callback);
       this.subscribeList[topic] = token;
     };
     Component.unsubscribe = function(topic) {
@@ -537,6 +530,7 @@
 
     return Fractal.Class.extend(Component);
   })();
+  Fractal.Components = {};
 
   Fractal.construct = function(callback){
     Fractal.construct = null;
