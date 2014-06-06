@@ -1,13 +1,20 @@
 (function(root){
   __startup = [];
-  var Fractal = function(callback){
-    if (!callback || typeof(callback) !== "function") return;
-    if (Fractal.__ready) return callback();
-    __startup.push(callback);
+  var Fractal = function(){
+    var callback = null;
+    if (typeof arguments[0] === 'function') {
+      callback = arguments[0];
+    } else if (typeof arguments[0] === 'string' && typeof arguments[1] === 'function') {
+      var name = arguments[0], component = arguments[1];
+      callback = function(){ Fractal.Components[name] = component; };
+    }
+    if (!callback) return;
+    if (Fractal.__ready) callback();
+    else __startup.push(callback);
   };
   Fractal.ready =  function(){
     Fractal.__ready = true;
-    __startup.forEach(function(v){ v(); });
+    __startup.forEach(function(v){v();});
     __startup = [];
   };
   // Settings
@@ -481,7 +488,7 @@
       };
 
       var __initComponent = function(name, $container) {
-        var component = new window[name](name, $container);
+        var component = new Fractal.Components[name](name, $container);
         component.load(function(name){
           return __onChildLoaded();
         });
@@ -490,16 +497,16 @@
       $subComponents.each(function(){
         var $subContainer = $(this);
         var name = $subContainer.data("name");
-        if (name in window) { // load instantly if $component.js is already includes
+        if (name in Fractal.Components) { // load instantly if $component.js is already included
           __initComponent(name, $subContainer);
         } else {
           var js = getComponentJS(name);
           Fractal.require(js, function(){ // create <script> and wait util ready
-            if (!(name in window)) {
+            if (name in Fractal.Components) {
+              __initComponent(name, $subContainer);
+            } else {
               console.error("Component object not found in " + js);
               __onChildLoaded(name); // TODO mark this as a failed load
-            } else {
-              __initComponent(name, $subContainer);
             }
           });
         }
