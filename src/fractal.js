@@ -271,12 +271,48 @@
   })();
 
   Fractal.Pubsub = (function() {
+    var Stock = function(){
+      this.arrived = {};
+      this.buffer = {};
+    };
+    var count = function(){
+      var count = 0;
+      for (var i in this.buffer) ++count;
+      return count;
+    };
+    Stock.prototype.add = function(topic, data) {
+      if (count.bind(this)() >= 10 && !(topic in this.buffer)) {
+        var oldest = new Data();
+        var oldestTopic = "";
+        for (var i in this.arrived) {
+          if (this.arrived[i] < oldest) {
+            oldest = this.arrived[i];
+            oldestTopic = i;
+          }
+        }
+        delete this.buffer[oldestTopic];
+        delete this.arrived[oldestTopic];
+      }
+      this.buffer[topic] = data;
+      this.arrived[topic] = new Date();
+    };
+    Stock.prototype.get = function(topic) {
+      if (topic in this.buffer) {
+        var data = this.buffer[topic];
+        delete this.buffer[topic];
+        delete this.arrived[topic];
+        return data;
+      }
+      return null;
+    };
+
     var topics = {};
     var seq = 0;
     var Pubsub = {};
+    var stock = new Stock();
     Pubsub.publish = function(topic, data) {
       if (!topics[topic]) {
-        // no listener
+        stock.add(topic, data);
         return;
       }
       var subscribers = topics[topic];
@@ -294,21 +330,37 @@
         token: token,
         callback: callback
       });
+
+      var data = stock.get(topic);
+      if (data) callback(topic, data);
+
       return token;
     };
     Pubsub.unsubscribe = function(topic, token) {
-      if (!topics[topic]) return;
+      if (!(topic in topics)) return;
       var subscribers = topics[topic];
       for (var i in subscribers) {
         if (subscribers[i].token === token) {
           subscribers.splice(i, 1);
-          return;
+          break;
         }
       }
+      if (subscribers.length === 0)
+        delete topics[topic];
     };
     return Pubsub;
   }());
 
+  Fractal.getTemplate = function(templateName, callback){
+    var $template = $('script[type="text/template"][id="template-' + templateName + '"]');
+    if ($template.length > 0) {
+      callback($template.html());
+    } else {
+      Fractal.require(templateName + ".tmpl", function(template){
+        callback(template);
+      });
+    }
+  };
   Fractal.components = {};
   Fractal.Component = (function(){
     var ComponentFilter = '[data-role=component]';
@@ -325,7 +377,6 @@
         };
       }
     };
-
     var setUnload = function(self, func) {
       if (func && typeof(func) === "function") {
         self.$container.on("destroyed", func.bind(self));
@@ -348,7 +399,7 @@
       // self.parent = null;
 
       setLoad(self, self.getData);
-      setLoad(self, self.getTemplateFunc());
+      setLoad(self, self.getTemplate);
       setLoad(self, self.getRenderFunc());
       setLoad(self, self.afterRender);
       setLoad(self, self.onMyselfLoaded);
@@ -357,6 +408,7 @@
 
       if (!self.loadOnce) setUnload(self, self.unload);
     };
+    Component.setTemplate = function(name) { this.template = name; this.cachedTemplate = null; };
     Component.load = function(callback) {
       this.$contents = null;
       callback();
@@ -369,62 +421,20 @@
       this.unsubscribe();
       delete Fractal.components[this._id];
     };
-    Component.__getTemplate = function(callback) {
+    Component.getTemplate = function(callback) {
       var self = this;
-      if (self.templateContents) {
+      if (self.cachedTemplate) return callback();
+      Fractal.getTemplate(self.template || self.name, function(data){
+        if (self.getData !== NOP) data = Hogan.compile(data);
+        self.cachedTemplate = data;
         callback();
-      } else {
-        var resourceId = self.template || self.name;
-        var $template = $('script[type="text/template"][id="template-' + resourceId + '"]');
-        if ($template.length > 0) {
-          self.templateContents = $template.html();
-          callback();
-        } else {
-          Fractal.require(resourceId + ".tmpl", function(template){
-            self.templateContents = template;
-            callback();
-          });
-        }
-      }
-    };
-    Component.__getCompiledTemplate = function(callback) {
-      var self = this;
-      if (self.compiledTemplate) {
-        callback();
-      } else {
-        self.__getTemplate(function(){
-          if (!self.templateContents) {
-            console.error("failed to load template" + this.name);
-            self.compiledTemplate = null;
-          } else {
-            self.compiledTemplate = Hogan.compile(self.templateContents);
-          }
-          callback();
-        });
-      }
-    };
-    Component.getTemplateFunc = function(){
-      var self = this;
-      if (self.getData === NOP) {
-        self.setTemplate = function(name) {
-          self.template = name;
-          self.templateContents = null;
-        };
-        return self.__getTemplate;
-      } else {
-        self.setTemplate = function(name) {
-          self.template = name;
-          self.templateContents = null;
-          self.compiledTemplate = null;
-        };
-        return self.__getCompiledTemplate;
-      }
+      });
     };
     Component.getRenderFunc = function(){
       var self = this;
       var __render = (self.getData === NOP) ?
-        function(){ return self.templateContents; } :
-        function(){ return self.compiledTemplate.render(self.data, self.partials); };
+        function(){ return self.cachedTemplate; } :
+        function(){ return self.cachedTemplate.render(self.data, self.partials); };
       if (self.loadOnce) {
         return function(callback){
           var $html = $($.parseHTML(__render().trim()));
