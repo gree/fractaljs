@@ -1,19 +1,30 @@
 (function(root){
-
-  var Fractal = {};
-  Fractal.env = {};
+  var Fractal = function(callback){
+    if (!callback || typeof(callback) !== "function") return;
+    if (Fractal.__ready) return callback();
+    else {
+      if (!Fractal.__startup) Fractal.__startup = [];
+      Fractal.__startup.push(callback);
+    }
+  };
+  Fractal.ready =  function(){
+    Fractal.ready = null;
+    Fractal.__ready = true;
+    if (Fractal.__startup) {
+      Fractal.__startup.forEach(function(v){ v(); });
+      Fractal.__startup = [];
+    }
+  };
+  // Settings
   Fractal.API_ROOT = "/";
   Fractal.SOURCE_ROOT = "";
-  Fractal.REQUIRE_DATA_CACHE = true;
-
-  // Settings
-  Fractal.TOPIC = { // TODO should be TOPIC_"PREFIX"
+  Fractal.DOM_PARSER = "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js";
+  Fractal.TEMPLATE_ENGINE = "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js";
+  Fractal.TOPIC = {
     COMPONENT_LOADED_MYSELF: "Fractal.component.loaded.myself",
     COMPONENT_LOADED_CHILDREN: "Fractal.component.loaded.children",
-    DATA_UPDATED: "Fractal.data.updated",
-    DATASET_UPDATED: "Fractal.dataset.updated",
+    DATA_UPDATED: "Fractal.data.updated"
   };
-
   Fractal.PREFIX = {
     component: "",
     template: "",
@@ -21,9 +32,8 @@
     json: "",
     script: ""
   };
-
   // Objects
-  var Class = (function(){
+  Fractal.Class = (function(){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
      * MIT Licensed.
@@ -94,7 +104,7 @@
       container.appendChild(element);
     };
 
-    return Class.extend({
+    return Fractal.Class.extend({
       ajaxGet: function(url, options, callback) {
         var xhr = new XMLHttpRequest();
         xhr.open("GET", url, true);
@@ -162,12 +172,12 @@
         if (ext == "js") {
           var url = this.isAbs(resourceId) ? resourceId : this.getScriptUrl(resourceId);
           this.getJS(url, function(success){
-            callback({loaded: success});
+            callback(success);
           });
         } else if (ext == "css") {
           var url = this.isAbs(resourceId) ? resourceId : this.getCSSUrl(resourceId);
           this.getCSS(url, function(success){
-            callback({loaded: success});
+            callback(success);
           });
         } else if (ext == "tmpl") {
           var url = this.isAbs(resourceId) ? resourceId : this.getTemplateUrl(resourceId);
@@ -175,12 +185,16 @@
             if (err) callback(null);
             else callback(data);
           });
+        // } else if (ext == name || ext == "json") {
         } else {
           var url = this.isAbs(resourceId) ? resourceId : this.getJSONUrl(resourceId);
           this.getJSON(url, function(err, data) {
             if (err) callback(null);
             else callback(data);
           });
+        // } else {
+        //   console.warn("nothing to do with: " + resourceId);
+        //   callback(null);
         }
       }
     });
@@ -189,102 +203,69 @@
   Fractal.require = (function(){
     var requireDefault = (function(){
       var dataCache = {};
-      var listeners = [];
-
-      var updateData = function(name, data) {
-        dataCache[name] = data;
-        Fractal.Pubsub.publish(Fractal.TOPIC.DATA_UPDATED, name);
-      };
-
-      return function(resourceList, forcedRefresh, callback) {
-        var updated = {};
-
-        var __get = function(resource) {
-          var d = new $.Deferred();
-          if ((resource in dataCache) && !forcedRefresh) {
-            if (dataCache[resource]) {
-              return d.resolve();
-            } else {
-              if (!(resource in listeners))
-                listeners[resource] = [];
-              listeners[resource].push(d);
-              return d.promise();
-            }
+      var listeners = {};
+      return function(resource, callback, forcedRefresh) {
+        if ((resource in dataCache) && !forcedRefresh) {
+          if (dataCache[resource]) {
+            callback(dataCache[resource], true);
           } else {
-            dataCache[resource] = false;
-            Fractal.client.getResource(resource, function(data){
-              if (data) {
-                console.debug("cached require " + resource);
-                updateData(resource, data);
-                updated[resource] = data;
-              }
-              if (resource in listeners){
-                for (var i in listeners[resource]) {
-                  listeners[resource][i].resolve();
-                }
-                delete listeners[resource];
-              }
-              return d.resolve();
-            });
-            return d.promise();
+            if (!(resource in listeners)) listeners[resource] = [];
+            listeners[resource].push(callback);
           }
-        };
-
-        var getList = resourceList.map(function(v){ return __get(v); });
-        $.when.apply($, getList).done(function(){
-          callback(dataCache, updated);
-        });
+        } else {
+          dataCache[resource] = false;
+          Fractal.client.getResource(resource, function(data){
+            if (data) {
+              dataCache[resource] = data;
+            }
+            if (resource in listeners){
+              listeners[resource].forEach(function(v){ v(data); });
+              delete listeners[resource];
+            }
+            callback(data);
+          });
+        }
       };
     })();
 
-    var requireNoCache = function(resourceList, forcedRefresh, callback) {
-      var retData = {};
-      var total = resourceList.length;
-      var complete = 0;
-      resourceList.forEach(function(resource){
-        Fractal.client.getResource(resource, function(data){
-          if (data) {
-            console.debug("require " + resource);
-            retData[resource] = data;
-          }
-          complete++;
-          if (complete == total) {
-            callback(retData, retData);
-          }
-        });
-      });
+    var requireNoCache = function(resource, callback) {
+      Fractal.client.getResource(resource, callback);
     };
 
     return function(resourceList, options, callback) {
-      var returnSingle = false;
-      if (typeof(resourceList) == "string") {
-        returnSingle = true;
+      var wantarray = true;
+      if (typeof(resourceList) === "string") {
+        wantarray = false;
         resourceList = [resourceList];
       } else {
-        if (resourceList.length == 0) {
+        if (!resourceList.length) {
           if (callback) callback({});
           return;
         }
       }
-      if (typeof(options) == "function") {
+      if (typeof(options) === "function") {
         callback = options;
         options = null;
       }
       options = options || {};
-      var nocache = options.nocache || (!Fractal.REQUIRE_DATA_CACHE);
-      var _require = nocache ? requireNoCache : requireDefault;
+      var myRequire = (!!options.nocache) ? requireNoCache : requireDefault;
 
-      _require(resourceList, !!options.forced, function(data, updated) {
-        for (var i in updated) {
-          Fractal.Pubsub.publish(Fractal.TOPIC.DATASET_UPDATED, updated);
-          break;
-        }
-        if (callback) {
-          if (returnSingle) {
-            data = data[resourceList[0]];
+      var total = resourceList.length;
+      var complete = 0;
+      var retData = {};
+      var updated = {};
+      resourceList.forEach(function(v){
+        myRequire(v, function(data, cached){
+          if (!cached) updated[v] = true;
+          retData[v] = data;
+          if ((++complete) === total) {
+            if (callback) callback(wantarray ? retData : retData[resourceList[0]]);
+            for(var i in updated) {
+              Fractal.Pubsub.publish(Fractal.TOPIC.DATA_UPDATED, updated);
+              break;
+            }
           }
-          callback(data);
-        }
+        }, !!options.forced);
       });
     };
   })();
@@ -292,7 +273,6 @@
   Fractal.Pubsub = (function() {
     var topics = {};
     var seq = 0;
-
     var Pubsub = {};
     Pubsub.publish = function(topic, data) {
       if (!topics[topic]) {
@@ -326,28 +306,23 @@
         }
       }
     };
-
     return Pubsub;
   }());
 
   Fractal.components = {};
   Fractal.Component = (function(){
+    var ComponentFilter = '[data-role=component]';
     var NOP = null;
-    var compIdGen = 0;
+    var CompIdGen = 0;
 
     var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
 
     var setLoad = function(self, func) {
       if (func && typeof(func) === "function") {
-        if (!self.load) self.load = func.bind(self);
-        else {
-          var temp = self.load;
-          self.load = function(callback){
-            temp(function(){
-              func.bind(self, callback)();
-            });
-          }
-        }
+        var temp = self.load;
+        self.load = function(callback) {
+          temp.bind(self)(func.bind(self, callback));
+        };
       }
     };
 
@@ -360,10 +335,12 @@
     var Component = {};
     Component.init = function(name, $container){
       var self = this;
-      self._id = ++compIdGen;
+      self._id = ++CompIdGen;
+      self.$container = $container;
+      self.$container.css("display", "inline");
+      self.loadOnce = (self.$container.attr("load-once") === "true");
 
       self.name = name;
-      self.$container = $container;
       self.rendered = false;
       self.subscribeList = {};
       // // TODO implement if needed
@@ -378,28 +355,36 @@
       setLoad(self, self.loadChildren);
       setLoad(self, self.onAllLoaded);
 
-      setUnload(self, self.unload);
+      if (!self.loadOnce) setUnload(self, self.unload);
     };
-
+    Component.load = function(callback) {
+      this.$contents = null;
+      callback();
+    };
     Component.getData = NOP;
     Component.afterRender = NOP;
     Component.onAllLoaded = NOP;
     Component.unload = function(){
+      console.debug("unload component", this.name);
       this.unsubscribe();
       delete Fractal.components[this._id];
     };
     Component.__getTemplate = function(callback) {
       var self = this;
-      var resourceId = self.template || self.name;
-      var $template = $('script[type="text/template"][id="template-' + resourceId + '"]');
-      if ($template.length > 0) {
-        self.templateContents = $template.html();
+      if (self.templateContents) {
         callback();
       } else {
-        Fractal.require(resourceId + ".tmpl", function(template){
-          self.templateContents = template;
+        var resourceId = self.template || self.name;
+        var $template = $('script[type="text/template"][id="template-' + resourceId + '"]');
+        if ($template.length > 0) {
+          self.templateContents = $template.html();
           callback();
-        });
+        } else {
+          Fractal.require(resourceId + ".tmpl", function(template){
+            self.templateContents = template;
+            callback();
+          });
+        }
       }
     };
     Component.__getCompiledTemplate = function(callback) {
@@ -418,39 +403,55 @@
         });
       }
     };
-
     Component.getTemplateFunc = function(){
-      if (this.getData === NOP) {
-        return this.__getTemplate;
+      var self = this;
+      if (self.getData === NOP) {
+        self.setTemplate = function(name) {
+          self.template = name;
+          self.templateContents = null;
+        };
+        return self.__getTemplate;
       } else {
-        return this.__getCompiledTemplate;
+        self.setTemplate = function(name) {
+          self.template = name;
+          self.templateContents = null;
+          self.compiledTemplate = null;
+        };
+        return self.__getCompiledTemplate;
       }
     };
     Component.getRenderFunc = function(){
-      if (this.getData === NOP) {
-        return function(callback) {
-          var self = this;
-          self.$container.html(self.templateContents);
+      var self = this;
+      var __render = (self.getData === NOP) ?
+        function(){ return self.templateContents; } :
+        function(){ return self.compiledTemplate.render(self.data, self.partials); };
+      if (self.loadOnce) {
+        return function(callback){
+          var $html = $($.parseHTML(__render().trim()));
+          self.$container.replaceWith($html);
+          self.$contents = $html;
           callback();
         };
       } else {
-        return function(callback){
-          var self = this;
-          var html = self.compiledTemplate.render(self.data, self.partials);
-          self.$container.html(html);
+        return function(callback) {
+          self.$container.html(__render());
+          self.$contents = self.$container.contents();
           callback();
-        };
+        }
       }
     };
     Component.onMyselfLoaded = function(callback){
       this.rendered = true;
+      if (this.loadOnce) this.load = NOP;
       Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
     };
     Component.loadChildren = function(callback){
       var self = this;
-      $subComponents = self.$container.find('[data-role=component]');
+      if (!self.$contents) self.$contents = self.$container.contents();
+      $subComponents = self.$contents.find(ComponentFilter).andSelf().filter(ComponentFilter);
       var len = $subComponents.length;
+
       if (len == 0) {
         Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_CHILDREN, {name: self.name});
         if (callback) callback();
@@ -498,12 +499,17 @@
 
       });
     };
+
     Component.publish = function(topic, data) {
       data = data || null;
       Fractal.Pubsub.publish(topic, data);
     };
     Component.subscribe = function(topic, callback){
-      var token = Fractal.Pubsub.subscribe(topic, callback);
+      var self = this;
+      var token = Fractal.Pubsub.subscribe(topic, function(topic, data){
+        console.debug("subscriber:", self.name, topic);
+        callback(topic, data);
+      });
       this.subscribeList[topic] = token;
     };
     Component.unsubscribe = function(topic) {
@@ -518,34 +524,21 @@
       }
     };
 
-    return Class.extend(Component);
+    return Fractal.Class.extend(Component);
   })();
 
-  // Usually used as the start point for constructing a webpage
-  Fractal.construct = function(callback) {
-    $.event.special.destroyed = {
-      remove: function(o) {
-        if (o.handler) {
-          o.handler()
+  Fractal.construct = function(callback){
+    Fractal.construct = null;
+    Fractal.require([Fractal.DOM_PARSER, Fractal.TEMPLATE_ENGINE], function(){
+      $.event.special.destroyed = {
+        remove: function(o) {
+          if (o.handler) o.handler();
         }
       }
-    }
-
-    var rootComponent = new Fractal.Component("__ROOT__", $(document));
-    rootComponent.loadChildren(callback);
+      var c = new Fractal.Component("__ROOT__", $(document));
+      c.loadChildren(callback);
+    });
   };
-
-  Fractal.platform = (function(){
-    if (window.location.href.indexOf("http") == 0) {
-      return "www";
-    }
-    var isAndroid = !!(navigator.userAgent.match(/Android/i));
-    var isIOS     = !!(navigator.userAgent.match(/iPhone|iPad|iPod/i));
-
-    if (isAndroid) return "android";
-    else if (isIOS) return "ios";
-    else return "www";
-  })();
 
   if (typeof define === 'function' && define.amd) {
     define(function () {
@@ -557,4 +550,6 @@
     root.Fractal = Fractal;
   }
 
+  Fractal.ready();
 }(( typeof window === 'object' && window ) || this));
+

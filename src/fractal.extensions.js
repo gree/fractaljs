@@ -1,51 +1,75 @@
-(function(){
-  if (!window.Fractal) {
-    throw new Error("include fractal.js first");
-  }
-
+Fractal(function(){
   Fractal.DataMonitor = (function () {
-    var DEFAULT_INTERVAL = 5000; // check every 5sec
-    var _dataNameDict = {};
+    var DEFAULT_INTERVAL = 10000; // check every 60 sec
+    var _dataSubscribers = {};
     var _runner = null;
 
+    Fractal.Pubsub.subscribe(Fractal.TOPIC.DATA_UPDATED, function(topic, data){
+      var called = {};
+      for (var i in data) {
+        if (i in _dataSubscribers) {
+          var subscribers = _dataSubscribers[i];
+          for (var j in subscribers) {
+            if (j in called) continue;
+            called[j] = true;
+            console.debug("DataMonitor callback", j);
+            subscribers[j]();
+          }
+        }
+      }
+    });
+
     var DataMonitor = {};
-    DataMonitor.register = function(dataNameList, interval) {
-      if (dataNameList.length == 0) return;
-      for (var i in dataNameList) {
-        if (dataNameList[i] in _dataNameDict) continue;
-        _dataNameDict[dataNameList[i]] = true;
+    DataMonitor.register = function(dataName, component, onUpdate) {
+      if (!(dataName in _dataSubscribers)) {
+        _dataSubscribers[dataName] = {};
       }
-      // start after the first registration
+      if (component.name in _dataSubscribers[dataName]) return;
+      console.debug("DataMonitor register", dataName, component.name);
+      _dataSubscribers[dataName][component.name] = onUpdate.bind(component);
       if (!_runner) {
-        this.start(interval);
+        this.start();
       }
     };
 
-    DataMonitor.unregister = function(dataName) {
-      if (dataName in _dataNameDict) {
-        delete _dataNameDict[dataName];
+    DataMonitor.unregister = function(dataName, component) {
+      if (dataName in _dataSubscribers) {
+        var subscribers  = _dataSubscribers[dataName];
+        if (component.name in subscribers) {
+          delete subscribers[component.name];
+        }
+        var empty = true;
+        for (var i in subscribers) {
+          empty = false;
+          break;
+        }
+        if (empty) delete _dataSubscribers[dataName];
       }
     };
 
-    DataMonitor.start = function(interval) {
+    DataMonitor.__start = function(interval) {
       if (_runner) return;
       var empty = true;
-      for (var i in _dataNameDict) {
+      for (var i in _dataSubscribers) {
         empty = false;
         break;
       }
       if (empty) return;
-      var interval = interval || DEFAULT_INTERVAL;
+
       var self = this;
-      _runner = setInterval(function(){
+      var interval = interval || DEFAULT_INTERVAL;
+
+      var __getData = function(){
         var dataList = [];
-        for (var i in _dataNameDict) {
+        for (var i in _dataSubscribers) {
           dataList.push(i);
         }
-        if (dataList.length == 0) {
-          self.stop();
-        }
-        Fractal.require(dataList, {forced: true}, function() {});
+        console.debug("DataMonitor require", dataList);
+        Fractal.require(dataList, {forced: true});
+      };
+      __getData();
+      _runner = setInterval(function(){
+        __getData();
       }, interval);
       console.debug("DataMonitor started");
     };
@@ -58,41 +82,47 @@
       }
     };
 
+    DataMonitor.enable = function(){
+      DataMonitor.start = DataMonitor.__start;
+      DataMonitor.start();
+    };
+
+    DataMonitor.disable = function(){
+      DataMonitor.start = function(){};
+      DataMonitor.stop();
+    };
+
+    DataMonitor.enable();
     return DataMonitor;
   })();
 
   Fractal.Console = (function(){
     // initial setup
     var __log_method_in_order = ["debug", "log", "info", "warn", "error"];
-    var LogLevel = {};
-    for (var level in __log_method_in_order) {
-      var levelName = __log_method_in_order[level];
-      LogLevel[levelName] = level;
-    }
     var MyConsole = {};
-    for (var levelName in LogLevel) {
+    for (var i in __log_method_in_order) {
+      var levelName = __log_method_in_order[i];
       MyConsole[levelName] = {
         true: window.console[levelName].bind(window.console),
         false: function(){}
       };
     }
 
-    var myLevel = -1;
+    var myLevel = "debug";
     var setLogLevel = function(newLevel) {
       if (newLevel == myLevel) return;
-      if (newLevel < 0 || newLevel >= __log_method_in_order.length) return;
       window.console = {}; // overide the original !!
       var enabled = false;
-      for (var level in __log_method_in_order) {
-        var levelName = __log_method_in_order[level];
-        if (level == newLevel) enabled = true;
+      for (var i in __log_method_in_order) {
+        var levelName = __log_method_in_order[i];
+        if (levelName == newLevel) enabled = true;
         window.console[levelName] = MyConsole[levelName][enabled];
       }
       myLevel = newLevel;
     };
 
     return {
-      LogLevel: LogLevel,
+      LogLevel: __log_method_in_order,
       setLogLevel: setLogLevel
     };
   })();
@@ -101,6 +131,10 @@
     var models = {};
     var MODELS_PREFIX = "Fractal.Models.";
 
+    var __exists = function(itemKey) {
+      return !!localStorage.getItem(itemKey);
+    }
+
     var __load = function(itemKey, initData) {
       var data = null;
       var stored = localStorage.getItem(itemKey);
@@ -108,13 +142,13 @@
         try {
           data = JSON.parse(stored);
         } catch (e) {
-          console.error(itemKey, "storage was broken");
+          console.error(itemKey, "storage was broken", stored);
         }
       }
       if (!data) {
         __save(itemKey, initData);
         data = initData;
-      } 
+      }
       return data;
     };
 
@@ -129,44 +163,49 @@
 
     models.FlatKV = (function(){
       var KEY_PREFIX = MODELS_PREFIX + "flatkv.";
-      var INIT_DATA = {};
 
-      var FlatKV = function(name) {
+      var FlatKV = function(name, defaults) {
         this.key = KEY_PREFIX + name;
+        this.defaults = defaults;
       };
       var proto = FlatKV.prototype;
 
       proto.getAll = function(key) {
-        return __load(this.key, INIT_DATA);
+        return __load(this.key, this.defaults);
       };
       proto.get = function(key) {
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         return data[key];
       };
       proto.set = function(key, value) {
-        var data = __load(this.key, INIT_DATA);
-        data[key] = value;
-        __save(this.key, data);
+        if (typeof key == "object") {
+          __remove(this.key);
+          var data = __load(this.key, this.defaults);
+          var obj = key;
+          for(var i in obj) {
+            data[i] = obj[i];
+          }
+          __save(this.key, data);
+        } else {
+          var data = __load(this.key, this.defaults);
+          data[key] = value;
+          __save(this.key, data);
+        }
       };
       proto.unset = function(key, value) {
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         delete data[key];
         __save(this.key, data);
       };
       proto.clear = function() {
         __remove(this.key);
       };
+
       return FlatKV;
     })();
 
     models.Ring = (function(){
       var KEY_PREFIX = MODELS_PREFIX + "Ring.";
-      var INIT_DATA = {
-        max: 100,
-        uniq: true,
-        head: -1,
-        container: []
-      };
 
       var __guessGetKey = function(v) {
         if (typeof(v) == "object") {
@@ -179,36 +218,48 @@
         return JSON.stringify(v);
       };
 
-      var Ring = function(name){
+      var Ring = function(name, max, uniq){
+        if (typeof uniq == 'undefined') uniq = true;
         this.key = KEY_PREFIX + name;
+        this.defaults = {
+          max: max || 100,
+          uniq: !!uniq,
+          head: -1,
+          container: []
+        };
       };
       var proto = Ring.prototype;
+
+      proto.exists = function(){
+        return __exists(this.key);
+      };
 
       proto.getStoreId = function() {
         return this.key;
       };
       proto.setMax = function(max) {
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         data.max = max;
         __save(this.key, data);
       };
       proto.setUniq = function(isUniq) {
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         data.uniq = isUniq;
         __save(this.key, data);
       };
       proto.addList = function(valueList, getKey) {
         var self = this;
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         valueList.forEach(function(v){ self.__add(data, v, getKey); });
         __save(this.key, data);
       },
-      proto.addOne = function(value, getKey) {
-        var data = __load(this.key, INIT_DATA);
-        this.add(data, value, getKey);
+      proto.add = function(value, getKey) {
+        var data = __load(this.key, this.defaults);
+        this.__add(data, value, getKey);
         __save(this.key, data);
       }
       proto.__add = function(data, value, getKey) {
+        if (!value) return;
         if (data.uniq) {
           // duplicate check
           getKey = getKey || __guessGetKey(value);
@@ -226,7 +277,7 @@
         data.container[data.head] = value;
       };
       proto.update = function(value, getKey){
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         getKey = getKey || __guessGetKey(value);
         var keyToUpd = getKey(value);
         var __updated = false;
@@ -243,7 +294,7 @@
         }
       },
       proto.remove = function(value, getKey) {
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         getKey = getKey || __guessGetKey(value);
         var keyToRemove = getKey(value);
 
@@ -260,7 +311,7 @@
         if (updated) __save(this.key, data);
       };
       proto.getMostRecent = function(num) {
-        var data = __load(this.key, INIT_DATA);
+        var data = __load(this.key, this.defaults);
         num = num || data.max;
         if (num > data.max) num = data.max;
         var result = [];
@@ -274,6 +325,20 @@
         }
         return result;
       };
+      proto.shift = function() {
+        var data = __load(this.key, this.defaults);
+        for (var i=0; i<data.container.length; i++) {
+          var pos = data.head + i + 1;
+          if (pos >= data.container.length) pos = pos - data.container.length;
+          if (typeof (data.container[pos]) !== 'undefined' && data.container[pos] !== null) {
+            var ret = data.container[pos];
+            this.remove(ret);
+            return ret
+          }
+        }
+        return null;
+      };
+
       proto.clear = function() {
         __remove(this.key);
       };
@@ -283,5 +348,4 @@
 
     return models;
   })();
-
-})();
+});
