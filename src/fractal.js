@@ -352,7 +352,6 @@
     };
     return Pubsub;
   }());
-
   Fractal.getTemplate = function(templateName, callback){
     var $template = $('script[type="text/template"][id="template-' + templateName + '"]');
     if ($template.length > 0) {

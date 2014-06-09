@@ -24,6 +24,12 @@ Fractal(function(){
     }).join("&");
   };
 
+  Fractal.next = function(page, params) {
+    params = params || {};
+    params.page = page;
+    window.location.hash = "#" + Fractal.encodeParam(params);
+  };
+
   Fractal.env = (function(){
     Fractal.TOPIC.ENV_CHANGED = "Fractal.env.changed";
     var env = {};
@@ -56,7 +62,6 @@ Fractal(function(){
         Fractal.Pubsub.publish(Fractal.TOPIC.ENV_CHANGED, changed);
         break;
       }
-      console.log("env change", env, changed);
     }
     window.onpopstate = function(){ onchange(); };
     //window.onhashchange = function(){ onchange(); };
@@ -64,6 +69,21 @@ Fractal(function(){
     window.onpopstate();
     return env;
   })();
+
+  Fractal.Components.Router = Fractal.Component.extend({
+    template: '<div data-role="component" data-name="{{componentName}}" />',
+    init: function(name, $container) {
+      var self = this;
+      self._super(name, $container);
+      self.subscribe(Fractal.TOPIC.ENV_CHANGED, function(topic, data){
+        if (!self.rendered) return;
+        self.onEnvChange(data);
+      });
+    },
+    onEnvChange: function(data) {
+      throw new Error("to be extended");
+    }
+  });
 
   Fractal.platform = (function(){
     if (window.location.href.indexOf("http") == 0) {
