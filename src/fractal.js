@@ -1,5 +1,4 @@
 (function(root){
-  __startup = [];
   var Fractal = function(){
     var callback = null;
     if (typeof arguments[0] === 'function') {
@@ -10,16 +9,22 @@
     }
     if (!callback) return;
     if (Fractal.__ready) callback();
-    else __startup.push(callback);
+    else {
+      if (!Fractal.__startup) Fractal.__startup = [];
+      Fractal.__startup.push(callback);
+    }
   };
   Fractal.ready =  function(){
+    Fractal.ready = null;
     Fractal.__ready = true;
-    __startup.forEach(function(v){v();});
-    __startup = [];
+    if (Fractal.__startup) {
+      Fractal.__startup.forEach(function(v){ v(); });
+      Fractal.__startup = [];
+    }
   };
   // Settings
-  Fractal.API_ROOT = "/";
-  Fractal.SOURCE_ROOT = "";
+  Fractal.API_ROOT = window.location.pathname.slice(0, -1);
+  Fractal.SOURCE_ROOT = Fractal.API_ROOT;
   Fractal.DOM_PARSER = "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js";
   Fractal.TEMPLATE_ENGINE = "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js";
   Fractal.TOPIC = {
@@ -30,127 +35,77 @@
   Fractal.PREFIX = {
     component: "",
     template: "",
-    css: "",
-    json: "",
-    script: ""
   };
-  // Objects
-  Fractal.Class = (function(){
-    /* Simple JavaScript Inheritance
-     * By John Resig http://ejohn.org/
-     * MIT Licensed.
-     */
-    // Inspired by base2 and Prototype
-    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
-    var Class = function(){};
-    Class.extend = function(prop) {
-      var _super = this.prototype;
-
-      initializing = true;
-      var prototype = new this();
-      initializing = false;
-
-      for (var name in prop) {
-        prototype[name] = typeof prop[name] == "function" &&
-          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-          (function(name, fn){
-            return function() {
-              var tmp = this._super;
-              this._super = _super[name];
-
-              var ret = fn.apply(this, arguments);
-              this._super = tmp;
-
-              return ret;
-            };
-          })(name, prop[name]) :
-          prop[name];
-      }
-
-      function Class() {
-        if ( !initializing && this.init )
-          this.init.apply(this, arguments);
-      }
-
-      Class.prototype = prototype;
-      Class.prototype.constructor = Class;
-
-      Class.extend = arguments.callee;
-
-      return Class;
-    };
-
-    return Class;
-  })();
-
-  Fractal.Client = (function(){
-    var AddElement = function(element, callback) {
+  // get external resources
+  Fractal.require = (function(){
+    var getByAddingElement = function(element, callback) {
       var __myTimer = setTimeout(function(){
         console.error("Timeout: adding " + element.src);
-        callback(false); // require failed
+        callback(true, false); // err, result
       }, 10000);
-
       var container = document.getElementsByTagName("head")[0];
       {
         var done = false;
         element.onload = element.onreadystatechange = function(){
           if ( !done && (!this.readyState ||
-            this.readyState == "loaded" || this.readyState == "complete") ) {
+                         this.readyState == "loaded" || this.readyState == "complete") ) {
             done = true;
             clearTimeout(__myTimer);
-            if (callback) callback(true);
+            callback(false, true); // err, result
             element.onload = element.onreadystatechange = null;
           }
         };
       }
       container.appendChild(element);
     };
-
-    return Fractal.Class.extend({
-      ajaxGet: function(url, options, callback) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState == 4) {
-            if ((xhr.status == 200 || xhr.status == 0) && xhr.responseText) {
-              callback(null, xhr.responseText);
-            } else {
-              console.error("unexpected server resposne: " + xhr.status + " " + url);
-              callback(true, null);
-            }
+    var getByAjax = function(url, options, callback){
+      if (typeof options === 'function') {
+        callback = options;
+        options = {};
+      }
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == 4) {
+          if ((xhr.status == 200 || xhr.status == 0) && xhr.responseText) {
+            callback(false, xhr.responseText);
+          } else {
+            console.error("unexpected server resposne: " + xhr.status + " " + url);
+            callback(true, false);
           }
         }
-
-        if (options && options.contentType)
-          xhr.setRequestHeader("Accept" , options.contentType);
-        xhr.send("");
-      },
-
-      isAbs: function(url) {
-        return (url.indexOf("/") == 0 || url.indexOf(".") == 0 || url.indexOf("http") == 0);
-      },
-
-      getScriptUrl: function(name) { return Fractal.SOURCE_ROOT + Fractal.PREFIX.script + name; },
-      getCSSUrl: function(name) { return Fractal.SOURCE_ROOT + Fractal.PREFIX.css + name; },
-      getJSONUrl: function(name) { return Fractal.API_ROOT + Fractal.PREFIX.json + name; },
-      getTemplateUrl: function(name) { return Fractal.SOURCE_ROOT + Fractal.PREFIX.template + name; },
-
-      getJS: function(url, callback) {
+      }
+      if (options && options.contentType)
+        xhr.setRequestHeader("Accept" , options.contentType);
+      xhr.send("");
+    };
+    var Ext2Type = { "js": "script", "css": "css", "tmpl": "template" };
+    var getType = function(resourceId) {
+      var name = resourceId.split('/').pop();
+      var ext = name.split('.').pop();
+      return Ext2Type[ext] || "json";
+    };
+    var getUrl = function(type, name) {
+      var base = (type === "json") ? Fractal.API_ROOT : Fractal.SOURCE_ROOT;
+      if (name.indexOf("/") === 0) return base + name;
+      else if (name.indexOf(".") === 0) return window.location.pathname + name;
+      else return base + (Fractal.PREFIX[type] || "") + name;
+    };
+    var Type2Getter = {
+      "script": function(url, callback) {
         var el = document.createElement("script");
         el.src = url;
-        AddElement(el, callback);
+        getByAddingElement(el, callback);
       },
-      getCSS: function(url, callback) {
+      "css": function(url, callback) {
         var el = document.createElement("link");
         el.rel="stylesheet";
         el.href = url;
-        var container = document.getElementsByTagName("head")[0];
-        container.appendChild(el);
-        callback(true);
+        getByAddingElement(el, callback);
       },
-      getJSON: function(url, callback) {
-        this.ajaxGet(url, {contentType: "application/json"}, function(err, responseText){
+      "template": getByAjax,
+      "json": function(url, callback){
+        getByAjax(url, {contentType: "application/json"}, function(err, responseText){
           if (err) callback(err, responseText);
           else {
             var data = null;
@@ -158,51 +113,19 @@
               data = JSON.parse(responseText);
             } catch (e) {
               console.error("failed to parse responseText, url: " + url + ", res: " + responseText);
-              callback(true, null);
+              callback(true, false);
             }
             callback(false, data);
           }
         });
       },
-      getTemplate: function(url, callback) {
-        this.ajaxGet(url, null, callback);
-      },
+    };
+    var getResource = function(resourceId, callback) {
+      var type = getType(resourceId);
+      var url = getUrl(type, resourceId);
+      Type2Getter[type](url, callback);
+    };
 
-      getResource: function(resourceId, callback) {
-        var name = resourceId.split('/').pop();
-        var ext = name.split('.').pop();
-        if (ext == "js") {
-          var url = this.isAbs(resourceId) ? resourceId : this.getScriptUrl(resourceId);
-          this.getJS(url, function(success){
-            callback(success);
-          });
-        } else if (ext == "css") {
-          var url = this.isAbs(resourceId) ? resourceId : this.getCSSUrl(resourceId);
-          this.getCSS(url, function(success){
-            callback(success);
-          });
-        } else if (ext == "tmpl") {
-          var url = this.isAbs(resourceId) ? resourceId : this.getTemplateUrl(resourceId);
-          this.getTemplate(url, function(err, data) {
-            if (err) callback(null);
-            else callback(data);
-          });
-        // } else if (ext == name || ext == "json") {
-        } else {
-          var url = this.isAbs(resourceId) ? resourceId : this.getJSONUrl(resourceId);
-          this.getJSON(url, function(err, data) {
-            if (err) callback(null);
-            else callback(data);
-          });
-        // } else {
-        //   console.warn("nothing to do with: " + resourceId);
-        //   callback(null);
-        }
-      }
-    });
-  })();
-  Fractal.client = new Fractal.Client();
-  Fractal.require = (function(){
     var requireDefault = (function(){
       var dataCache = {};
       var listeners = {};
@@ -216,8 +139,8 @@
           }
         } else {
           dataCache[resource] = false;
-          Fractal.client.getResource(resource, function(data){
-            if (data) {
+          getResource(resource, function(err, data){
+            if (!err) {
               dataCache[resource] = data;
             }
             if (resource in listeners){
@@ -229,9 +152,8 @@
         }
       };
     })();
-
     var requireNoCache = function(resource, callback) {
-      Fractal.client.getResource(resource, callback);
+      getResource(resource, function(err, data){ callback(data); });
     };
 
     return function(resourceList, options, callback) {
@@ -271,87 +193,54 @@
       });
     };
   })();
+  // Objects
+  Fractal.Class = (function(){
+    /* Simple JavaScript Inheritance
+     * By John Resig http://ejohn.org/
+     * MIT Licensed.
+     */
+    // Inspired by base2 and Prototype
+    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
+    var Class = function(){};
+    Class.extend = function(prop) {
+      var _super = this.prototype;
 
-  Fractal.Pubsub = (function() {
-    var Stock = function(){
-      this.arrived = {};
-      this.buffer = {};
-    };
-    var count = function(){
-      var count = 0;
-      for (var i in this.buffer) ++count;
-      return count;
-    };
-    Stock.prototype.add = function(topic, data) {
-      if (count.bind(this)() >= 10 && !(topic in this.buffer)) {
-        var oldest = new Data();
-        var oldestTopic = "";
-        for (var i in this.arrived) {
-          if (this.arrived[i] < oldest) {
-            oldest = this.arrived[i];
-            oldestTopic = i;
-          }
-        }
-        delete this.buffer[oldestTopic];
-        delete this.arrived[oldestTopic];
+      initializing = true;
+      var prototype = new this();
+      initializing = false;
+
+      for (var name in prop) {
+        prototype[name] = typeof prop[name] == "function" &&
+          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
+          (function(name, fn){
+            return function() {
+              var tmp = this._super;
+              this._super = _super[name];
+
+              var ret = fn.apply(this, arguments);
+              this._super = tmp;
+
+              return ret;
+            };
+          })(name, prop[name]) :
+        prop[name];
       }
-      this.buffer[topic] = data;
-      this.arrived[topic] = new Date();
-    };
-    Stock.prototype.get = function(topic) {
-      if (topic in this.buffer) {
-        var data = this.buffer[topic];
-        delete this.buffer[topic];
-        delete this.arrived[topic];
-        return data;
+
+      function Class() {
+        if ( !initializing && this.init )
+          this.init.apply(this, arguments);
       }
-      return null;
+
+      Class.prototype = prototype;
+      Class.prototype.constructor = Class;
+
+      Class.extend = arguments.callee;
+
+      return Class;
     };
 
-    var topics = {};
-    var seq = 0;
-    var Pubsub = {};
-    var stock = new Stock();
-    Pubsub.publish = function(topic, data) {
-      if (!topics[topic]) {
-        stock.add(topic, data);
-        return;
-      }
-      var subscribers = topics[topic];
-      for (var i in subscribers) {
-        subscribers[i].callback(topic, data);
-      }
-      return;
-    };
-    Pubsub.subscribe = function(topic, callback) {
-      if (!topics[topic]) {
-        topics[topic] = [];
-      }
-      var token = ++seq;
-      topics[topic].push({
-        token: token,
-        callback: callback
-      });
-
-      var data = stock.get(topic);
-      if (data) callback(topic, data);
-
-      return token;
-    };
-    Pubsub.unsubscribe = function(topic, token) {
-      if (!(topic in topics)) return;
-      var subscribers = topics[topic];
-      for (var i in subscribers) {
-        if (subscribers[i].token === token) {
-          subscribers.splice(i, 1);
-          break;
-        }
-      }
-      if (subscribers.length === 0)
-        delete topics[topic];
-    };
-    return Pubsub;
-  }());
+    return Class;
+  })();
   Fractal.getTemplate = function(templateName, callback){
     var $template = $('script[type="text/template"][id="template-' + templateName + '"]');
     if ($template.length > 0) {
@@ -550,6 +439,87 @@
       c.loadChildren(callback);
     });
   };
+  // pub-sub
+  Fractal.Pubsub = (function() {
+    var Stock = function(){
+      this.arrived = {};
+      this.buffer = {};
+    };
+    var count = function(){
+      var count = 0;
+      for (var i in this.buffer) ++count;
+      return count;
+    };
+    Stock.prototype.add = function(topic, data) {
+      if (count.bind(this)() >= 10 && !(topic in this.buffer)) {
+        var oldest = new Data();
+        var oldestTopic = "";
+        for (var i in this.arrived) {
+          if (this.arrived[i] < oldest) {
+            oldest = this.arrived[i];
+            oldestTopic = i;
+          }
+        }
+        delete this.buffer[oldestTopic];
+        delete this.arrived[oldestTopic];
+      }
+      this.buffer[topic] = data;
+      this.arrived[topic] = new Date();
+    };
+    Stock.prototype.get = function(topic) {
+      if (topic in this.buffer) {
+        var data = this.buffer[topic];
+        delete this.buffer[topic];
+        delete this.arrived[topic];
+        return data;
+      }
+      return null;
+    };
+
+    var topics = {};
+    var seq = 0;
+    var Pubsub = {};
+    var stock = new Stock();
+    Pubsub.publish = function(topic, data) {
+      if (!topics[topic]) {
+        stock.add(topic, data);
+        return;
+      }
+      var subscribers = topics[topic];
+      for (var i in subscribers) {
+        subscribers[i].callback(topic, data);
+      }
+      return;
+    };
+    Pubsub.subscribe = function(topic, callback) {
+      if (!topics[topic]) {
+        topics[topic] = [];
+      }
+      var token = ++seq;
+      topics[topic].push({
+        token: token,
+        callback: callback
+      });
+
+      var data = stock.get(topic);
+      if (data) callback(topic, data);
+
+      return token;
+    };
+    Pubsub.unsubscribe = function(topic, token) {
+      if (!(topic in topics)) return;
+      var subscribers = topics[topic];
+      for (var i in subscribers) {
+        if (subscribers[i].token === token) {
+          subscribers.splice(i, 1);
+          break;
+        }
+      }
+      if (subscribers.length === 0)
+        delete topics[topic];
+    };
+    return Pubsub;
+  }());
 
   if (typeof define === 'function' && define.amd) {
     define(function () {
@@ -563,4 +533,3 @@
 
   Fractal.ready();
 }(( typeof window === 'object' && window ) || this));
-

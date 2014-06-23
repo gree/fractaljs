@@ -71,17 +71,31 @@ Fractal(function(){
   })();
 
   Fractal.Components.Router = Fractal.Component.extend({
+    getComponentName: function(changedEnv, callback) { throw new Error("to be extended"); },
     template: '<div data-role="component" data-name="{{componentName}}" />',
     init: function(name, $container) {
       var self = this;
       self._super(name, $container);
       self.subscribe(Fractal.TOPIC.ENV_CHANGED, function(topic, data){
         if (!self.rendered) return;
-        self.onEnvChange(data);
+        self.getComponentName(data, function(componentName){
+          if (self.data && self.data.componentName !== componentName) {
+            self.data = { componentName: componentName };
+            self.load();
+          }
+        });
       });
     },
-    onEnvChange: function(data) {
-      throw new Error("to be extended");
+    getData: function(callback) {
+      var self = this;
+      if (!self.data) {
+        self.getComponentName({}, function(componentName){
+          self.data = { componentName: componentName };
+          callback();
+        });
+      } else {
+        callback();
+      }
     }
   });
 
@@ -106,8 +120,7 @@ Fractal(function(){
       if (self.TEMPLATE_ENGINE) Fractal.TEMPLATE_ENGINE = self.TEMPLATE_ENGINE;
       if (self.SOURCE_ROOT) Fractal.SOURCE_ROOT = self.SOURCE_ROOT;
       if (self.API_ROOT) Fractal.API_ROOT = self.API_ROOT;
-      if (self.PREFIX)
-        for (var i in self.PREFIX) Fractal.PREFIX[i] = self.PREFIX[i];
+      if (self.PREFIX) for (var i in self.PREFIX) Fractal.PREFIX[i] = self.PREFIX[i];
       Fractal.require([Fractal.DOM_PARSER, Fractal.TEMPLATE_ENGINE], function(){
         $(function(){
           self.REQUIRE_LIST = self.REQUIRE_LIST || [];
