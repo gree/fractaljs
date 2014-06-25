@@ -33,6 +33,19 @@
     DATA_UPDATED: "Fractal.data.updated"
   };
   Fractal.PREFIX = {}; // component, template
+
+  var Seq = {
+    __seq: 1,
+    __last: (+new Date),
+    get: function(){ return Seq.__seq; },
+    increment: function(){
+      var now = +new Date;
+      if (now - Seq.__last > 100) {
+        ++Seq.__seq;
+        Seq.__last = now;
+      }
+    },
+  };
   // get external resources
   Fractal.require = (function(){
     var byAddingElement = function(element, callback) {
@@ -129,10 +142,10 @@
       var dataCache = {};
       var listeners = {};
 
-      var __require = function(resource, callback, options){
+      var __require = function(resource, callback){
         dataCache[resource] = null;
         getResource(resource, function(err, data){
-          if (!err) dataCache[resource] = {seq: options.setSeq || Seq.get(), data: data};
+          if (!err) dataCache[resource] = {seq: Seq.get(), data: data};
           if (resource in listeners) {
             listeners[resource].forEach(function(v){ v(data); });
             delete listeners[resource];
@@ -141,26 +154,22 @@
         });
       };
 
-      return function(resource, callback, options) {
+      return function(resource, callback) {
         if (resource in dataCache) {
           if (dataCache[resource]) {
             if (dataCache[resource].seq >= Seq.get()) callback(dataCache[resource].data, true);
-            else __require(resource, callback, options);
+            else __require(resource, callback);
           } else {
             if (!(resource in listeners)) listeners[resource] = [];
             listeners[resource].push(callback);
           }
         } else {
-          __require(resource, callback, options);
+          __require(resource, callback);
         }
       };
     })();
 
-    var requireNoCache = function(resource, callback) {
-      getResource(resource, function(err, data){ callback(data); });
-    };
-
-    return function(resourceList, options, callback) {
+    return function(resourceList, callback) {
       var wantarray = true;
       if (typeof(resourceList) === "string") {
         wantarray = false;
@@ -171,19 +180,12 @@
           return;
         }
       }
-      if (typeof(options) === "function") {
-        callback = options;
-        options = null;
-      }
-      options = options || {};
-      var myRequire = (!!options.nocache) ? requireNoCache : requireDefault;
-
       var total = resourceList.length;
       var complete = 0;
       var retData = {};
       var updated = {};
       resourceList.forEach(function(v){
-        myRequire(v, function(data, cached){
+        requireDefault(v, function(data, cached){
           if (!cached) updated[v] = true;
           retData[v] = data;
           if ((++complete) === total) {
@@ -193,7 +195,7 @@
               break;
             }
           }
-        }, options);
+        });
       });
     };
   })();
@@ -267,22 +269,8 @@
       });
     };
   })();
-
-  var Seq = {
-    __seq: 1,
-    __last: (+new Date),
-    get: function(){ return Seq.__seq; },
-    increment: function(){
-      var now = +new Date;
-      if (now - Seq.__last > 500) {
-        ++Seq.__seq;
-        Seq.__last = now;
-      }
-    },
-  };
   Fractal.Component = (function(){
     var ComponentFilter = '[data-role=component]';
-    var NOP = null;
     var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
 
     var setLoad = function(self, func) {
@@ -301,31 +289,30 @@
 
     var Component = {};
     Component.init = function(name, $container){
-      var self = this;
-      self.$container = $container;
-      var resetDisplay = self.$container.data("display");
-      if (resetDisplay) self.$container.css("display", resetDisplay);
-      self.loadOnce = self.loadOnce || (self.$container.attr("load-once") === "true");
+      this.name = name;
+      this.$container = $container;
+      var resetDisplay = this.$container.data("display");
+      if (resetDisplay) this.$container.css("display", resetDisplay);
+      this.loadOnce = this.loadOnce || (!!this.$container.attr("load-once"));
 
-      self.name = name;
-      self.rendered = false;
-      self.subscribeList = {};
+      this.rendered = false;
+      this.subscribeList = {};
       // // TODO implement if needed
       // self.children = [];
       // self.parent = null;
-      self.templateName = self.templateName || self.name;
-      if (self.template && typeof(self.template) === "string")
-        self.template = Hogan.compile(self.template);
+      this.templateName = this.templateName || self.name;
+      if (this.template && typeof(this.template) === "string")
+        this.template = Hogan.compile(this.template);
 
-      setLoad(self, self.getData);
-      setLoad(self, self.getTemplate);
-      setLoad(self, self.getRenderFunc());
-      setLoad(self, self.afterRender);
-      setLoad(self, self.onMyselfLoaded);
-      setLoad(self, self.loadChildren);
-      setLoad(self, self.onAllLoaded);
+      setLoad(this, this.getData);
+      setLoad(this, this.getTemplate);
+      setLoad(this, this.getRenderFunc());
+      setLoad(this, this.afterRender);
+      setLoad(this, this.onMyselfLoaded);
+      setLoad(this, this.loadChildren);
+      setLoad(this, this.onAllLoaded);
 
-      if (!self.loadOnce) setUnload(self, self.unload);
+      setUnload(this, this.unload);
     };
     Component.setTemplate = function(name) {
       this.templateName = name;
@@ -339,12 +326,10 @@
       Seq.increment();
       this.__load(callback);
     };
-    Component.getData = NOP;
-    Component.afterRender = NOP;
-    Component.onAllLoaded = NOP;
-    Component.unload = function(){
-      this.unsubscribe();
-    };
+    Component.getData = null;
+    Component.afterRender = null;
+    Component.onAllLoaded = null;
+    Component.unload = function(){ this.unsubscribe(); };
     Component.getTemplate = function(callback) {
       var self = this;
       if (self.template) return callback();
@@ -373,7 +358,7 @@
     };
     Component.onMyselfLoaded = function(callback){
       this.rendered = true;
-      if (this.loadOnce) this.load = NOP;
+      if (this.loadOnce) this.load = null;
       Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
     };
@@ -426,30 +411,20 @@
       });
     };
 
-    Component.publish = function(topic, data) {
-      data = data || null;
-      Fractal.Pubsub.publish(topic, data);
-    };
+    Component.publish = function(topic, data) { Fractal.Pubsub.publish(topic, data); };
     Component.subscribe = function(topic, callback){
-      var self = this;
-      var token = Fractal.Pubsub.subscribe(topic, callback);
-      this.subscribeList[topic] = token;
+      this.subscribeList[topic] = Fractal.Pubsub.subscribe(topic, callback);;
     };
     Component.unsubscribe = function(topic) {
       if (!topic) {
-        for (var i in this.subscribeList) {
-          Fractal.Pubsub.unsubscribe(i, this.subscribeList[i]);
-        }
+        for (var i in this.subscribeList) Fractal.Pubsub.unsubscribe(i, this.subscribeList[i]);
       } else {
-        if (topic in this.subscribeList) {
-          Fractal.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
-        }
+        if (topic in this.subscribeList) Fractal.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     };
     Fractal.Components = {};
     return Fractal.Class.extend(Component);
   })();
-
   Fractal.construct = function(callback){
     Fractal.construct = null;
     Fractal.require([Fractal.DOM_PARSER, Fractal.TEMPLATE_ENGINE], function(){
@@ -501,47 +476,39 @@
 
     var topics = {};
     var seq = 0;
-    var Pubsub = {};
     var stock = new Stock();
-    Pubsub.publish = function(topic, data) {
-      if (!topics[topic]) {
-        stock.add(topic, data);
-        return;
-      }
-      var subscribers = topics[topic];
-      for (var i in subscribers) {
-        subscribers[i].callback(topic, data);
-      }
-      return;
-    };
-    Pubsub.subscribe = function(topic, callback) {
-      if (!topics[topic]) {
-        topics[topic] = [];
-      }
-      var token = ++seq;
-      topics[topic].push({
-        token: token,
-        callback: callback
-      });
-
-      var data = stock.get(topic);
-      if (data) callback(topic, data);
-
-      return token;
-    };
-    Pubsub.unsubscribe = function(topic, token) {
-      if (!(topic in topics)) return;
-      var subscribers = topics[topic];
-      for (var i in subscribers) {
-        if (subscribers[i].token === token) {
-          subscribers.splice(i, 1);
-          break;
+    return {
+      publish: function(topic, data) {
+        if (!topics[topic]) {
+          stock.add(topic, data);
+          return;
         }
-      }
-      if (subscribers.length === 0)
-        delete topics[topic];
+        var subscribers = topics[topic];
+        for (var i in subscribers) subscribers[i].callback(topic, data);
+      },
+      subscribe: function(topic, callback) {
+        if (!topics[topic]) topics[topic] = [];
+        var token = ++seq;
+        topics[topic].push({
+          token: token,
+          callback: callback
+        });
+        var data = stock.get(topic);
+        if (data) callback(topic, data);
+        return token;
+      },
+      unsubscribe: function(topic, token) {
+        if (!(topic in topics)) return;
+        var subscribers = topics[topic];
+        for (var i in subscribers) {
+          if (subscribers[i].token === token) {
+            subscribers.splice(i, 1);
+            break;
+          }
+        }
+        if (subscribers.length === 0) delete topics[topic];
+      },
     };
-    return Pubsub;
   }());
 
   if (typeof define === 'function' && define.amd) {
