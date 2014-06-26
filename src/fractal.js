@@ -301,8 +301,7 @@
       // self.children = [];
       // self.parent = null;
       this.templateName = this.templateName || self.name;
-      if (this.template && typeof(this.template) === "string")
-        this.template = Hogan.compile(this.template);
+      if (typeof(this.template) === "string") this.template = Hogan.compile(this.template);
 
       setLoad(this, this.getData);
       setLoad(this, this.getTemplate);
