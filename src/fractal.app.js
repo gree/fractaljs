@@ -23,13 +23,11 @@ Fractal(function(){
       else return encodeURIComponent(v[0]) + "=" + encodeURIComponent(v[1]);
     }).join("&");
   };
-
   Fractal.next = function(page, params) {
     params = params || {};
     params.page = page;
     window.location.hash = "#" + Fractal.encodeParam(params);
   };
-
   Fractal.env = (function(){
     Fractal.TOPIC.ENV_CHANGED = "Fractal.env.changed";
     var env = {};

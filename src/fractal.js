@@ -1,19 +1,19 @@
-(function(root){
-  var Fractal = function(){
+(function(window){
+  var Fractal = function(arg1, arg2){
     var callback = null;
-    if (typeof arguments[0] === 'function') {
-      callback = arguments[0];
-    } else if (typeof arguments[0] === 'string' && typeof arguments[1] === 'function') {
-      var name = arguments[0], component = arguments[1];
+    if (typeof(arg1) === 'function') { // register a onReady callback
+      callback = arg1
+    } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') { // add a component
+      var name = arg1, component = arg2;
       callback = function(){ Fractal.Components[name] = component; };
     }
     if (!callback) return;
-    if (Fractal.__ready) callback();
-    else {
-      if (!Fractal.__startup) Fractal.__startup = [];
-      Fractal.__startup.push(callback);
-    }
+    if (Fractal.__ready) return callback();
+    if (!Fractal.__startup) Fractal.__startup = [];
+    Fractal.__startup.push(callback);
   };
+  window.Fractal = Fractal;
+
   Fractal.ready =  function(){
     Fractal.ready = null;
     Fractal.__ready = true;
@@ -23,10 +23,11 @@
     }
   };
   // Settings
-  Fractal.API_ROOT = window.location.pathname;
+  Fractal.API_ROOT = window.location.pathname.split("/").slice(0, -1).join("/") + "/";
   Fractal.SOURCE_ROOT = Fractal.API_ROOT;
-  Fractal.DOM_PARSER = "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js";
-  Fractal.TEMPLATE_ENGINE = "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js";
+  var protocol = window.location.protocol == "file:" ? "http:" : window.location.protocol;
+  Fractal.DOM_PARSER = protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js";
+  Fractal.TEMPLATE_ENGINE = protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js";
   Fractal.TOPIC = {
     COMPONENT_LOADED_MYSELF: "Fractal.component.loaded.myself",
     COMPONENT_LOADED_CHILDREN: "Fractal.component.loaded.children",
@@ -293,6 +294,7 @@
     Component.init = function(name, $container){
       this.name = name;
       this.$container = $container;
+      this.$ = this.$container.find.bind(this.$container);
       var resetDisplay = this.$container.data("display");
       if (resetDisplay) this.$container.css("display", resetDisplay);
       this.loadOnce = this.loadOnce || (!!this.$container.attr("load-once"));
@@ -323,9 +325,15 @@
       this.$contents = null;
       callback();
     };
-    Component.load = function(callback) {
+    Component.load = function(param, callback) {
+      var self = this;
+      if (typeof(param) === 'function') {
+        callback = param;
+        param = null;
+      }
       Seq.increment();
-      this.__load(callback);
+      self.param = param;
+      self.__load(function(){ self.param = null; });
     };
     Component.getData = null;
     Component.getTemplate = function(callback) {
@@ -376,6 +384,7 @@
 
       var __initComponent = function(name, $container) {
         var component = new Fractal.Components[name](name, $container);
+        component.param = self.param;
         component.__load(function(name){
           return __onChildLoaded();
         });
@@ -503,15 +512,5 @@
     };
   }());
 
-  if (typeof define === 'function' && define.amd) {
-    define(function () {
-      return Fractal;
-    });
-  } else if (typeof module === 'object' && module.exports){
-    module.exports = Fractal;
-  } else {
-    root.Fractal = Fractal;
-  }
-
   Fractal.ready();
-}(( typeof window === 'object' && window ) || this));
+})(window);
