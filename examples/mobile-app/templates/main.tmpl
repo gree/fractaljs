@@ -1,0 +1,21 @@
+<div data-role="component" data-name="header"></div>
+
+<div id="st-container" class="st-container st-effect-{{effect}}">
+  {{^in_pusher}}
+	<nav class="st-menu st-effect-{{effect}}">
+    <div data-role="component" data-name="sidebar"></div>
+	</nav>
+  {{/in_pusher}}
+	<div class="st-pusher">
+    {{#in_pusher}}
+	  <nav class="st-menu st-effect-{{effect}}">
+      <div data-role="component" data-name="sidebar"></div>
+	  </nav>
+    {{/in_pusher}}
+		<div class="st-content">
+			<div class="st-content-inner">
+        <div data-role="component" data-name="body"></div>
+		  </div>
+		</div>
+	</div>
+</div>
