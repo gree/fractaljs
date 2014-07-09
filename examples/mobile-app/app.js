@@ -19,7 +19,7 @@
       ];
     },
   });
-  var app = App();
+  var app = new App();
   app.start();
 
 })( window );
