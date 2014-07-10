@@ -6,7 +6,7 @@ js web framework
 ### Demo:
 
 * cd fractaljs
-* npm install
-* node app.js
-* open in chrome: http://localhost:8765/html/fractal.html
+* npm intall -g grunt-cli
+* grunt
+* open in chrome: http://localhost:9001/html/fractal.html
 
