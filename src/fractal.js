@@ -13,6 +13,7 @@
     Fractal.__startup.push(callback);
   };
   window.Fractal = Fractal;
+  window.F = Fractal; // alias
 
   Fractal.ready =  function(){
     Fractal.ready = null;
@@ -309,6 +310,7 @@
 
       this.rendered = false;
       this.subscribeList = {};
+      this.earlyRecieved = [];
       // // TODO implement if needed
       // self.children = [];
       // self.parent = null;
@@ -366,6 +368,12 @@
     Component.afterRender = null;
     Component.onMyselfLoaded = function(callback){
       this.rendered = true;
+      if (this.earlyRecieved.length) {
+        this.earlyRecieved.forEach(function(v) {
+          v.callback(v.topic, v.data);
+        });
+        this.earlyRecieved = [];
+      }
       if (this.loadOnce) this.load = null;
       Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
@@ -417,7 +425,11 @@
 
     Component.publish = function(topic, data) { Fractal.Pubsub.publish(topic, data); };
     Component.subscribe = function(topic, callback){
-      this.subscribeList[topic] = Fractal.Pubsub.subscribe(topic, callback);;
+      var self = this;
+      self.subscribeList[topic] = Fractal.Pubsub.subscribe(topic, function(topic, data){
+        if (self.rendered) callback(topic, data);
+        else self.earlyRecieved.push({topic: topic, data: data, callback: callback});
+      });
     };
     Component.unsubscribe = function(topic) {
       if (!topic) {
