@@ -342,8 +342,12 @@
         param = null;
       }
       Seq.increment();
+      console.debug(self.name, "load, param:", param);
       self.param = param;
-      self.__load(function(){ self.param = null; });
+      self.__load(function(){
+        self.param = null;
+        if (callback) callback();
+      });
     };
     Component.getData = null;
     Component.getTemplate = function(callback) {
@@ -378,7 +382,9 @@
       Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
     };
-    Component.loadChildren = (function(){
+    Component.loadChildren = function(callback){
+      var self = this;
+
       var __initComponent = function(name, $container, callback) {
         if (name in Fractal.Components) {
           var component = new Fractal.Components[name](name, $container);
@@ -395,31 +401,29 @@
           });
         }
       }
-      return function(callback){
-        var self = this;
-        if (!self.$contents) self.$contents = self.$container.contents();
-        $subComponents = self.$contents.find(ComponentFilter).andSelf().filter(ComponentFilter);
-        var len = $subComponents.length;
-        if (len == 0) {
-          Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_CHILDREN, {name: self.name});
-          if (callback) callback();
-          return;
-        }
-        // start to load children
-        var finished = 0;
-        $subComponents.each(function(){
-          var $subContainer = $(this);
-          var name = $subContainer.data("name");
-          __initComponent(name, $subContainer, function(err, name) {
-            if (err) console.error("Failed to load component: " + name + " reason: " + err);
-            if (++finished === len) {
-              Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_CHILDREN, {name: self.name});
-              if (callback) callback();
-            }
-          });
+
+      if (!self.$contents) self.$contents = self.$container.contents();
+      $subComponents = self.$contents.find(ComponentFilter).andSelf().filter(ComponentFilter);
+      var len = $subComponents.length;
+      if (len == 0) {
+        Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_CHILDREN, {name: self.name});
+        if (callback) callback();
+        return;
+      }
+      // start to load children
+      var finished = 0;
+      $subComponents.each(function(){
+        var $subContainer = $(this);
+        var name = $subContainer.data("name");
+        __initComponent(name, $subContainer, function(err, name) {
+          if (err) console.error("Failed to load component: " + name + " reason: " + err);
+          if (++finished === len) {
+            Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_CHILDREN, {name: self.name});
+            if (callback) callback();
+          }
         });
-      };
-    })(),
+      });
+    },
     Component.onAllLoaded = null;
     Component.unload = function(){ this.unsubscribe(); };
 
