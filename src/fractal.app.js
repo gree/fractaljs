@@ -23,7 +23,7 @@ Fractal(function(){
       else return encodeURIComponent(v[0]) + "=" + encodeURIComponent(v[1]);
     }).join("&");
   };
-  Fractal.next = function(page, params) {
+  Fractal.navigate = function(page, params) {
     params = params || {};
     params.page = page;
     window.location.hash = "#" + Fractal.encodeParam(params);
@@ -62,9 +62,8 @@ Fractal(function(){
       }
     }
     window.onpopstate = function(){ onchange(); };
-    //window.onhashchange = function(){ onchange(); };
-
     window.onpopstate();
+
     return env;
   })();
 

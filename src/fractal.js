@@ -322,7 +322,8 @@
       setLoad(this, this.render);
       setLoad(this, this.afterRender);
       setLoad(this, this.onMyselfLoaded);
-      setLoad(this, this.loadChildren);
+      if (!this.loadMyselfOnly)
+        setLoad(this, this.loadChildren);
       setLoad(this, this.onAllLoaded);
 
       setUnload(this, this.unload);
@@ -342,7 +343,6 @@
         param = null;
       }
       Seq.increment();
-      console.debug(self.name, "load, param:", param);
       self.param = param;
       self.__load(function(){
         self.param = null;
@@ -446,7 +446,6 @@
     return Fractal.Class.extend(Component);
   })();
   Fractal.construct = function(callback){
-    Fractal.construct = null;
     Fractal.require([Fractal.DOM_PARSER, Fractal.TEMPLATE_ENGINE], function(){
       $.event.special.destroyed = {
         remove: function(o) {
