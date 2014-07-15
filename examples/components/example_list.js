@@ -19,8 +19,8 @@ F("exampleBase", F.Component.extend({
   getData: function(cb){
     var self = this;
     var demo = self.getDemo();
-    var jsQuery = "components/" + demo + ".js";
-    var tmplQuery = "templates/" + demo + ".tmpl";
+    var jsQuery = "examples/components/" + demo + ".js";
+    var tmplQuery = "examples/templates/" + demo + ".tmpl";
     F.require([jsQuery, tmplQuery], {contentType: "text/plain"}, function(data){
       for (var i in data) { data[i] = data[i].trim(); }
       var rows = Math.min(

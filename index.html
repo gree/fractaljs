@@ -36,17 +36,17 @@
       <div data-role="component" data-name="example_list"></div>
     </div>
 
-    <script type="text/javascript" src="../src/fractal.js"></script>
-    <script type="text/javascript" src="../src/fractal.app.js"></script>
+    <script type="text/javascript" src="src/fractal.js"></script>
+    <script type="text/javascript" src="src/fractal.app.js"></script>
     <script>
       var App = Fractal.App.extend({
         init: function(){
           this.PREFIX = {
-            component: "components/",
-            template: "templates/",
+            component: "examples/components/",
+            template: "examples/templates/",
           };
           this.REQUIRE_LIST = [
-            "css/index.css",
+            "examples/css/index.css",
             "//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css",
             "//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js",
           ];
