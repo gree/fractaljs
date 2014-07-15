@@ -1,0 +1,62 @@
+<!-- sample template for json editor -->
+<!-- the while Object          - .je-object, must have "data-path" attribute -->
+<!-- for each field            - .je-field, must have "data-path" attribute -->
+<!-- for each field input      - .je-input, must support val() function for getting the value -->
+<!-- button to remove fields   - .je-btn-remove-field -->
+<!-- for adding a new field: -->
+<!-- new field key             - .je-input-add-key -->
+<!-- button to add a new field - .je-btn-add-field -->
+
+<table class="table table-condensed je-object" data-path="{{path}}">
+  <tbody>
+    {{#fields}}
+    <tr class="je-field" data-path="{{path}}" {{#attrs}}{{key}}='{{value}}'{{/attrs}}>
+      <td>
+        {{#removable}}
+        <button class="close je-btn-remove-field" tabindex="-1">&times;</button>
+        {{/removable}}
+      </td>
+      <th>{{key}}</th>
+      <td>
+        {{#is_obj}}
+        {{>json_editor}}
+        {{/is_obj}}
+        {{^is_obj}}
+        <div class="control-group je-control">
+          {{#single_value}}
+          <input class="form-control je-input je-control" type="text" value='{{value}}' {{#attrs}}{{key}}='{{value}}'{{/attrs}} />
+          {{/single_value}}
+          {{#select_value}}
+          <select class="je-input je-control" {{#attrs}}{{key}}='{{value}}'{{/attrs}}>
+            <option value="">select ...</option>
+            {{#options}}
+            <option {{#selected}}selected="true"{{/selected}} value="{{value}}">{{key}}</option>
+            {{/options}}
+          </select>
+          {{/select_value}}
+          <span class="help-inline je-field-help"></span>
+        </div>
+        {{/is_obj}}
+      </td>
+      {{#fields_editable}}
+      <td></td>
+      {{/fields_editable}}
+    </tr>
+    {{/fields}}
+
+    {{#fields_editable}}
+    <tr class="je-field">
+      <td></td>
+      <th>
+      </th>
+      <td>
+        <input class="form-control input-small je-input-add-key je-control" type="text" value="key" />
+      </td>
+      <td>
+        <button type="button" class="btn btn-default je-btn-add-field">add</button>
+      </td>
+    </tr>
+    {{/fields_editable}}
+  </tbody>
+</table>
+

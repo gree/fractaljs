@@ -1,0 +1,28 @@
+<h3>{{title}}</h3>
+<ul>
+{{#desc}}
+<li>{{.}}</li>
+{{/desc}}
+</ul>
+
+<div class="col-xs-7">
+  <ul id="tab-{{demo}}" class="nav nav-tabs" role="tablist">
+    <li class="active"><a href="#tab-pane-{{demo}}-js" role="tab" data-toggle="tab">{{demo}}.js</a></li>
+    <li><a href="#tab-pane-{{demo}}-template" role="tab" data-toggle="tab">{{demo}}.tmpl</a></li>
+  </ul>
+  <div id="tab-content-{{demo}}" class="tab-content">
+    <div class="tab-pane fade in active" id="tab-pane-{{demo}}-js">
+      <textarea rows="{{rows}}">{{js}}</textarea>
+    </div>
+    <div class="tab-pane fade" id="tab-pane-{{demo}}-template">
+      <textarea rows="{{rows}}">{{template}}</textarea>
+    </div>
+  </div>
+</div>
+
+<div class="col-xs-5">
+  <div class="panel panel-default">
+    <div class="panel-heading">Result</div>
+    <div class="panel-body" data-role="component" data-name="{{demo}}"></div>
+  </div>
+</div>

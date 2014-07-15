@@ -1,0 +1,15 @@
+.je-object {
+    width: auto;
+}
+
+.je-field th {
+    text-align: right !important;
+    font-weight: bold;
+    border: 0px;
+}
+.je-field td {
+    border: 0px;
+}
+.je-control {
+    margin: 0 !important;
+}

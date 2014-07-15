@@ -94,13 +94,13 @@
       var ExtType = { "js": "script", "css": "css", "tmpl": "template" };
       return function(resourceId) {
         var ext = resourceId.split('.').pop();
-        return ExtType[ext] || "json";
+        return ExtType[ext] || "ajax";
       };
     })();
     var getUrl = function(type, name) {
       if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
       if (name.indexOf(".") === 0) return window.location.pathname + name;
-      var base = (type === "json") ? Fractal.API_ROOT : Fractal.SOURCE_ROOT;
+      var base = (type === "ajax") ? Fractal.API_ROOT : Fractal.SOURCE_ROOT;
       if (name.indexOf("/") === 0) return base + name.slice(1);
       return base + (Fractal.PREFIX[type] || "") + name;
     };
@@ -140,7 +140,7 @@
           });
         };
       })(),
-      "json": (function(){
+      "ajax": (function(){
         var cache = {};
         return function(url, callback, options){
           options = options || {};
@@ -149,15 +149,20 @@
             console.debug("require from cache", url);
             return callback(false, cache[url].data);
           }
+          var contentType = options.contentType || "application/json";
           console.debug("require new", url, forced, cache[url] ? cache[url].seq : "-1", Seq.get());
-          byAjax(url, {contentType: "application/json"}, function(err, responseText){
+          byAjax(url, {contentType: contentType}, function(err, responseText){
             if (err) return callback(err, responseText);
             var data = null;
-            try {
-              data = JSON.parse(responseText);
-            } catch (e) {
-              console.error("failed to parse responseText, url: " + url + ", res: " + responseText);
-              callback(true, false);
+            if (contentType === "application/json") {
+              try {
+                data = JSON.parse(responseText);
+              } catch (e) {
+                console.error("failed to parse responseText, url: " + url + ", res: " + responseText);
+                callback(true, false);
+              }
+            } else {
+              data = responseText;
             }
             cache[url] = { seq: Seq.get(), data: data };
             callback(false, data);
@@ -173,7 +178,7 @@
           return;
         }
         listeners[resource] = [callback];
-        var type = getType(resource);
+        var type = (options && options.contentType) ? "ajax" : getType(resource);
         var url = getUrl(type, resource);
         Type2Getter[type](url, function(err, data) {
           var callbackList = listeners[resource].map(function(v){return v;});
