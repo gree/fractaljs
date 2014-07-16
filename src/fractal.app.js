@@ -19,28 +19,40 @@ Fractal(function(){
       kvp.push([i, data[i]]);
     }
     return kvp.map(function(v){
-      if (v[0] === "page") return encodeURIComponent(v[1]);
-      else return encodeURIComponent(v[0]) + "=" + encodeURIComponent(v[1]);
+      return encodeURIComponent(v[0]) + "=" + encodeURIComponent(v[1]);
     }).join("&");
   };
-  Fractal.navigate = function(page, params) {
+  __ignoreEnvChange = {};
+  Fractal.navigate = function(page, params, ignoreEnvChange) {
     params = params || {};
-    params.page = page;
-    window.location.hash = "#" + Fractal.encodeParam(params);
+    var hash = "#" + page + "&" + Fractal.encodeParam(params);
+    if (window.location.hash !== hash) {
+      if (ignoreEnvChange) {
+        __ignoreEnvChange[hash] = true;
+      }
+      window.location.hash = hash;
+    }
   };
   Fractal.env = (function(){
     Fractal.TOPIC.ENV_CHANGED = "Fractal.env.changed";
     var env = {};
 
-    function _merge(myEnv) {
+    function parse() {
+      var queryString = window.location.search.substring(1);
+      queryString += "&";
+      queryString += window.location.hash.substring(1);
+
+      console.log("queryString", queryString);
+
+      var decoded = Fractal.decodeParam(queryString);
       var changed = {};
-      for (var i in myEnv) {
-        if (env[i] !== myEnv[i]) changed[i] = [env[i], myEnv[i]];
-        env[i] = myEnv[i];
+      for (var i in decoded) {
+        if (env[i] !== decoded[i]) changed[i] = [env[i], decoded[i]];
+        env[i] = decoded[i];
       }
       var removeList = [];
       for (var i in env) {
-        if (!(i in myEnv)) {
+        if (!(i in decoded)) {
           changed[i] = [env[i], undefined];
           removeList.push(i);
         }
@@ -51,18 +63,18 @@ Fractal(function(){
       return changed;
     }
 
-    function onchange() {
-      var queryString = window.location.search.substring(1);
-      queryString += "&";
-      queryString += window.location.hash.substring(1);
-      var changed = _merge(Fractal.decodeParam(queryString));
-      for (var i in changed) { // check if changed is empty
-        Fractal.Pubsub.publish(Fractal.TOPIC.ENV_CHANGED, changed);
-        break;
+    window.onpopstate = function(){
+      if (__ignoreEnvChange[window.location.hash]) {
+        delete __ignoreEnvChange[window.location.hash];
+      } else {
+        var changed = parse();
+        for (var i in changed) { // check if changed is empty
+          Fractal.Pubsub.publish(Fractal.TOPIC.ENV_CHANGED, changed);
+          break;
+        }
       }
-    }
-    window.onpopstate = function(){ onchange(); };
-    window.onpopstate();
+    };
+    parse();
 
     return env;
   })();
