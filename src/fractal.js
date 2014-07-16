@@ -290,18 +290,18 @@
     var ComponentFilter = '[data-role=component]';
     var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
 
-    var setLoad = function(self, func) {
-      if (func && typeof(func) === "function") {
-        var temp = self.__load;
-        self.__load = function(callback) {
-          temp.bind(self)(func.bind(self, callback));
-        };
+    var setLoad = function(self, next) {
+      if (!next) return;
+      if (!self.__load){
+        self.__load = next;
+        return;
       }
-    };
-    var setUnload = function(self, func) {
-      if (func && typeof(func) === "function") {
-        self.$container.on("destroyed", func.bind(self));
-      }
+      var temp = self.__load;
+      self.__load = function(callback, param) {
+        temp.bind(self)(function(){
+          next.bind(self)(callback, param);
+        }, param);
+      };
     };
 
     var Component = {};
@@ -312,6 +312,9 @@
       var resetDisplay = this.$container.data("display");
       if (resetDisplay) this.$container.css("display", resetDisplay);
       this.loadOnce = this.loadOnce || (!!this.$container.attr("load-once"));
+      if (!this.loadOnce) {
+        this.$container.on("destroyed", this.unload.bind(this));
+      }
 
       this.rendered = false;
       this.subscribeList = {};
@@ -330,30 +333,18 @@
       if (!this.loadMyselfOnly)
         setLoad(this, this.loadChildren);
       setLoad(this, this.onAllLoaded);
-
-      setUnload(this, this.unload);
     };
     Component.setTemplate = function(name) {
       this.templateName = name;
       this.template = null;
     };
-    Component.__load = function(callback) {
-      this.$contents = null;
-      callback();
-    };
-    Component.load = function(param, callback) {
-      var self = this;
-      if (typeof(param) === 'function') {
-        callback = param;
-        param = null;
-      }
+    Component.load = function(param, callback){
       Seq.increment();
-      self.param = param;
-      self.__load(function(){
-        self.param = null;
+      this.__load(function(){
         if (callback) callback();
-      });
+      }, param);
     };
+    Component.__load = null;
     Component.getData = null;
     Component.getTemplate = function(callback) {
       var self = this;
@@ -377,24 +368,21 @@
     Component.afterRender = null;
     Component.onMyselfLoaded = function(callback){
       this.rendered = true;
-      if (this.earlyRecieved.length) {
-        this.earlyRecieved.forEach(function(v) {
-          v.callback(v.topic, v.data);
-        });
-        this.earlyRecieved = [];
+      while (this.earlyRecieved.length > 0) {
+        var v = this.earlyRecieved.pop();
+        v.callback(v.topic, v.data);
       }
       if (this.loadOnce) this.load = null;
       Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
     };
-    Component.loadChildren = function(callback){
+    Component.loadChildren = function(callback, param){
       var self = this;
 
       var __initComponent = function(name, $container, callback) {
         if (name in Fractal.Components) {
           var component = new Fractal.Components[name](name, $container);
-          component.param = self.param;
-          component.__load(function(name) { callback(false, name); });
+          component.__load(function(){callback(false, name);}, param);
         } else {
           var js = getComponentJS(name);
           Fractal.require(js, function(){ // create <script> and wait util ready
