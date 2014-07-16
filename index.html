@@ -4,7 +4,7 @@
     <title>Fractal - Examples - Basic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1,maximum-scale=1, user-scalable=no">
   </head>
-  <body style="padding-top:55px;">
+  <body style="padding-top:50px;">
 
     <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
       <div class="container">
@@ -17,23 +17,65 @@
           </button>
           <a class="navbar-brand" href="#">FractalJS</a>
         </div>
-        <div class="navbar-collapse collapse">
+        <div class="navbar-collapse collapse pull-right">
+          <ul class="nav navbar-nav">
+            <li><a href="html/start.html">Getting Started</a></li>
+            <li><a href="html/docs.html">Doc</a></li>
+            <li><a href="html/docs.html">Apps</a></li>
+          </ul>
         </div>
       </div>
     </div>
 
-    <!--
     <div class="jumbotron">
       <div class="container">
-        <h2>FractalJS</h2>
-        <p>A Javascript Library For ...</p>
-        <p><a class="btn btn-primary btn-lg" role="button">Learn more &raquo;</a></p>
+        <h1>Divide and Conquer</h1>
+        <p>
+          <strong>FractalJS</strong> is a Front-end Javascript Library to
+          Help Breaking a Large Web Application into Small Parts
+          and Organize Them Together.
+        </p>
       </div>
     </div>
-    -->
 
     <div class="container">
+      <div class="row">
+        <div class="col-md-4">
+          <h3>Build App Like a Fractal</h3>
+          <p>
+            FractalJS gives an answer to the web development under the theory of "Dived and Conquer" -
+            Any application is made up of small features, the rendering and DOM event handling
+            of sub-features can be recusively repeated and combined to make the whole application
+            working.
+          </p>
+        </div>
+        <div class="col-md-4">
+          <h3>Simple</h3>
+          <p>
+            FractalJS only provide what you need to create sub-features and load them togetter.
+            Written in pure javascipt and with only a few user APIs provided,
+            FractalJS leaves almost full freedom to use any other libraries.
+          </p>
+        </div>
+        <div class="col-md-4">
+          <h3>NOT MVC ?</h3>
+          <p>
+            We just want to demonstrate a different approach of bulding web applications.
+            FractalJS is more a way of thinking than its implementation.
+            It is all about how to coodinate simple things to perform a complicated behavior.
+          </p>
+        </div>
+      </div>
+
+      <hr>
+
       <div data-role="component" data-name="example_list"></div>
+
+      <hr>
+
+      <footer>
+        <p>&copy; FractalJS 2014</p>
+      </footer>
     </div>
 
     <script type="text/javascript" src="src/fractal.js"></script>
