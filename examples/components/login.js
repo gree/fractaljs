@@ -7,13 +7,13 @@ F(function(){
       var self = this;
       self._super(name, $container);
       self.subscribe(Fractal.TOPIC.LOAD_LOGIN, function(){
-        self.load();
+        var name = localStorage.getItem(KEY);
+        self.load(name);
       });
     },
-    getData: function(cb) {
-      var name = localStorage.getItem(KEY);
+    getData: function(cb, param) {
+      var name = param;
       if (name) {
-        this.param = name;
         this.data = { componentName: "hello2" };
       } else {
         this.data = { componentName: "form" };

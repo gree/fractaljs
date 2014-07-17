@@ -45,8 +45,8 @@ F("example_hello", F.Components.exampleBase.extend({
     return [
       "Implement 'getData' method to set 'this.data'.",
       "FractalJS will try to find 'hello'.tmpl (Same name with the component),",
-      "Then pass 'this.data' as parameter to the template engine (Hogan, by default).",
-      "'this.param' will be expained in the 'Login' example."
+      "Then pass 'this.data' as parameter to the template engine.",
+      "The 2nd arg of 'getData'('param') lets you set some data from outside. (Explained later)"
     ];
   },
   getDemo: function() { return "hello"; },
@@ -73,8 +73,7 @@ F("example_login", F.Components.exampleBase.extend({
       "They are loaded recursively by 'login' depends on the value of 'componentName'.",
       "Multiple components/templates can be put together in 1 file.",
       "Fractaljs provides a simple Pub/Sub messaging function to support the communication between components.",
-      "'this.param' is available during the loading of the component including its childrens.",
-      "So we set 'this.param' in 'login' and it can be used in 'hello' (the grandchild)",
+      "'param' is available during the loading of the component including its childrens.",
       "'hello'(in the first example), is reused here as a child of 'hello2'."
     ]; },
   getDemo: function() { return "login"; },
