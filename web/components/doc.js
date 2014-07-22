@@ -1,4 +1,2 @@
-F("doc", F.Component.extend({
-
-}));
+F("doc", F.Components.MarkDownDoc.extend({}));
 
