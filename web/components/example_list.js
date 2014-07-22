@@ -8,6 +8,7 @@ F("example_list", F.Component.extend({
 }));
 
 F("exampleBase", F.Component.extend({
+  pathPrefix: "web",
   templateName: "example",
   getTitle: null,
   getDesc: null,
@@ -19,8 +20,8 @@ F("exampleBase", F.Component.extend({
   getData: function(cb){
     var self = this;
     var demo = self.getDemo();
-    var jsQuery = "examples/components/" + demo + ".js";
-    var tmplQuery = "examples/templates/" + demo + ".tmpl";
+    var jsQuery = self.pathPrefix + "/components/" + demo + ".js";
+    var tmplQuery = self.pathPrefix + "/templates/" + demo + ".tmpl";
     F.require([jsQuery, tmplQuery], {contentType: "text/plain"}, function(data){
       for (var i in data) { data[i] = data[i].trim(); }
       var rows = Math.min(
