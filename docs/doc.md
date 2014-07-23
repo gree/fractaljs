@@ -1,4 +1,4 @@
-This page lists all user APIs of FractalJS, only the names.
+This page lists all user APIs of FractalJS.
 It is intended to be *uncompleted*. ...
 
 Because FractalJS is still under active development,
