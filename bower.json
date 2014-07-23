@@ -1,0 +1,9 @@
+{
+  "name": "FractalJS",
+  "version": "1.0.0",
+  "description": "A Front-end Javascript Library to Help Breaking a Large Web Application into Small Parts and Organize Them Together.",
+  "main": "src/fractal.js",
+  "license": "MIT",
+  "homepage": "http://gree.github.io/fractaljs/",
+  "ignore": ["docs", "examples", "test", "*.md", "*.html"]
+}
