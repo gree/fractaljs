@@ -1,36 +1,39 @@
-# API #
+## fractal.js ##
 
-## Fractal(callback) ##
+### F(callback) ###
 
-## Fractal(componentName, extendedComponentClass) ##
+### F(name, componentClass) ###
 
-## Fractal.require(resourceNameList, options, callback) ##
+### F.require(resourceList, options, callback) ###
 
-## Fractal.getTemplate(templateNameList, callback) ##
+### F.getTemplate(templateList, callback) ###
 
-## Fractal.Component ##
+### F.Component ###
 
-### Fractal.Component.load ###
+#### F.Component.load ####
 
-### Fractal.Component.getData ###
+#### F.Component.getData ####
 
-### Fractal.Component.afterRender ###
+#### F.Component.afterRender ####
 
-### Fractal.Component.onAllLoaded ###
+#### F.Component.onAllLoaded ####
 
-### Fractal.Component.unload ###
+#### F.Component.unload ####
 
-### Fractal.Component.publish ###
+#### F.Component.publish ####
 
-### Fractal.Component.subscribe ###
+#### F.Component.subscribe ####
 
-## Fractal.construct ##
+### F.construct ###
 
-## Fractal.Pubsub ##
+### F.Pubsub ###
 
-### Fractal.Pubsub.publish ###
+#### F.Pubsub.publish ####
 
-### Fractal.Pubsub.subscribe ###
+#### F.Pubsub.subscribe ####
 
-### Fractal.Pubsub.unsubscribe ###
+#### F.Pubsub.unsubscribe ####
 
+## fractal.app.js ##
+
+### Fractal.App ###

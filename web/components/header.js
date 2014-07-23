@@ -1,8 +1,8 @@
 F("header", F.Component.extend({
   menuItems: {
-    "#start": "Getting Started",
-    "#doc": "Doc",
-    "?#": "Examples",
+    "?start": "Getting Started",
+    "?examples": "Examples",
+    "?doc": "Doc",
     "https://github.com/gree/fractaljs": "Github",
   },
   init: function(name, $container) {
@@ -16,7 +16,7 @@ F("header", F.Component.extend({
     var menus = [];
     for (var i in this.menuItems) {
       menus.push({
-        active: window.location.hash.indexOf(i) >= 0,
+        active: window.location.search.indexOf(i) >= 0,
         link: i,
         text: this.menuItems[i]
       });

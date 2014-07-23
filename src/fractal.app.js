@@ -8,7 +8,10 @@ Fractal(function(){
     myEnv = {};
 
     while (m = search.exec(queryString)) {
-      if (!m[2]) { m[2] = m[1]; m[1] = "page"; }
+      if (!m[2] && !myEnv.page) {
+        m[2] = m[1];
+        m[1] = "page";
+      }
       myEnv[decode(m[1])] = decode(m[2]);
     }
     return myEnv;
@@ -88,6 +91,7 @@ Fractal(function(){
       self.subscribe(Fractal.TOPIC.ENV_CHANGED, function(topic, data){
         if (!self.rendered) return;
         self.getComponentName(data, function(componentName){
+          if (!componentName) return;
           if (self.data && self.data.componentName !== componentName) {
             self.data = { componentName: componentName };
             self.load();
