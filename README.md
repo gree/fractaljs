@@ -1,12 +1,11 @@
-fractaljs
-=========
+### URL ###
 
-js web framework
+http://gree.github.io/fractaljs/
 
-### Demo:
+The whole website is built on FractalJS.
+To run it locally:
 
-* cd fractaljs
-* npm intall -g grunt-cli
+* checkout the gh-pages branch
+* npm install
 * grunt
-* open in chrome: http://localhost:9001/html/fractal.html
-
+* Then open your browser with the location: http://127.0.0.1:9001/
