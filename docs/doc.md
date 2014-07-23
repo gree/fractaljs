@@ -1,5 +1,5 @@
 This page lists all user APIs of FractalJS.
-It is intended to be *uncompleted*. ...
+It will be *uncompleted* for a long time. ...
 
 Because FractalJS is still under active development,
 
