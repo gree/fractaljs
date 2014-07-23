@@ -1,12 +1,11 @@
 fractaljs
 =========
 
-js web framework
+A Front-end Javascript Library to Help Breaking a Large Web Application into Small Parts and Organize Them Together.
 
-### Demo:
+### Docs:
 
-* cd fractaljs
-* npm intall -g grunt-cli
-* grunt
-* open in chrome: http://localhost:9001/html/fractal.html
+Everything can be found in
+
+http://gree.github.io/fractaljs/
 
