@@ -18,6 +18,7 @@ F("MarkDownDoc", F.Component.extend({
     var md = "docs/" + self.getDocName() + ".md";
     F.require(md, {contentType: "text/plain"}, function(data){
       F.require("//cdnjs.cloudflare.com/ajax/libs/marked/0.3.2/marked.min.js", function(){
+        marked.setOptions({ gfm: true });
         var doc = marked(data);
         self.data = { doc: doc };
         cb();
