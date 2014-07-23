@@ -5,5 +5,6 @@
   "main": "src/fractal.js",
   "license": "MIT",
   "homepage": "http://gree.github.io/fractaljs/",
-  "ignore": ["docs", "examples", "test", "*.md", "*.html"]
+  "ignore": ["docs", "examples", "test", "*.md", "*.html"],
+  "keywords": ["framework", "component", "fractal"]
 }
