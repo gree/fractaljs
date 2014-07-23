@@ -17,7 +17,7 @@ templates/head.tmpl
 templates/body.tmpl
 ```
 
-* fractal.js is from our [repository](https://git.gree-dev.net/xiaolu-liu/fractaljs/src/)
+* **fractal.js** is from our repository.
 
 ### index.html ###
 
@@ -100,7 +100,7 @@ components/body.js
 F("body", F.Component.extend({
   afterRender: function(cb) {
     this.$("#btn").click(function(){
-      alert("clicked!");  
+      alert("clicked!");
     });
     cb();
   },
