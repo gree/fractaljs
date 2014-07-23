@@ -36,7 +36,26 @@ F("MarkDownDoc", F.Component.extend({
 }));
 
 F("MDBody", F.Component.extend({
-  template: '{{{doc}}}',
+  template: '{{{doc}}}' +
+    '<a href="{{link}}">' +
+    '<div class="btn-improve label label-info hide" ' +
+    '  style="position:absolute;top:10px;right:10px;">improve me!</div>' +
+    '</a>',
+  init: function(name, $container) {
+    this._super(name, $container);
+    this.$container.css("position", "relative");
+  },
+  afterRender: function(cb){
+    var self = this;
+    // self.$('.btn-improve').click(function(){
+    // });
+    self.$container.mouseenter(function(){
+      self.$('.btn-improve').removeClass("hide");
+    });
+    self.$container.mouseleave(function(){
+      self.$('.btn-improve').addClass("hide");
+    });
+  },
   getData: function(cb) {
     var self = this;
     var name = self.$container.data("mdname");
@@ -44,7 +63,10 @@ F("MDBody", F.Component.extend({
     F.require(md, {contentType: "text/plain"}, function(data){
       F.require("//cdnjs.cloudflare.com/ajax/libs/marked/0.3.2/marked.min.js", function(){
         var doc = marked(data);
-        self.data = { doc: doc };
+        self.data = {
+          doc: doc,
+          link: "https://github.com/gree/fractaljs/blob/gh-pages/" + md
+        };
         cb();
       });
     });
