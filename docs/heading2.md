@@ -1,7 +1,5 @@
-### It is Simple ###
+### Minimalistic and highly extensible ###
 
-FractalJS only provide the functions for what you need to create sub-features and
-to load them together.
-Written in pure javascipt and with only a few user APIs provided,
-FractalJS leaves almost full freedom to use any other libraries.
+FractalJS is a minimalistic library that only focuses on functionality for creating and combining components.
+It is written in pure Javascipt, has a simple and lean api, and can be used in conjunction with almost all other libraries.
 

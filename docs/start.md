@@ -1,10 +1,8 @@
 # Getting Started #
 
-Let's first make something working.
+## A very basic example ##
 
-## A Very Basic Example ##
-
-Below is the file structure used in this tutorial:
+File structure for this tutorial project:
 
 ```
 index.html
@@ -16,8 +14,6 @@ templates/main.tmpl
 templates/head.tmpl
 templates/body.tmpl
 ```
-
-* **fractal.js** is from our repository.
 
 ### index.html ###
 
@@ -36,7 +32,7 @@ templates/body.tmpl
 <script>
   // 'F' is the alias of 'Fractal'
   F(function(){
-    // configuration: tell FractalJS where to get the components
+    // configuration: tell FractalJS where to get components from
     F.PREFIX.component = "components/";
     F.PREFIX.template = "templates/";
     // build the page
@@ -47,32 +43,32 @@ templates/body.tmpl
 </html>
 ```
 
-* **F.construct()** finds all **data-role="component"** elements in current DOM (by default it is document.body).
-* Then it try to load each component by its **data-name**
-  * Here, FractalJS will request components/**main**.js and templates/**main**.tmpl
+* **F.construct()** finds all **data-role="component"** elements in the current DOM (document.body by default).
+* Then it tries to load each component by its **data-name**
+  * In this example, FractalJS will import components/**main**.js and templates/**main**.tmpl
 
-### Define *main* component ###
+### Define the *main* component ###
 
 components/main.js
 ```javascript
 F("main", F.Component.extend({}));
 ```
-* A component can be defined by extending F.Component base class.
+* Define a component by extending from the F.Component base class.
 
 templates/main.tmpl
 ```html
 <div data-role="component" data-name="head"></div>
 <div data-role="component" data-name="body"></div>
 ```
-* Wrtie *.tmpl in [mustache](http://mustache.github.io/).
-* FractalJS by default uses [Hogan](http://twitter.github.io/hogan.js/) to render the template and put the rendered DOM into:
+* Write *.tmpl in [mustache](http://mustache.github.io/).
+* By default, FractalJS uses [Hogan](http://twitter.github.io/hogan.js/) to render the template, and places the rendered DOM under:
     ```
     <div data-role="component" data-name="main">
     ```
-* **head** and **body** are nested components. They will be loaded recursively, so we will define them as well.
+* **head** and **body** are nested components. They will be loaded recursively.
 
 
-### Define *head* component ###
+### Define the *head* component ###
 
 components/head.js
 
@@ -84,7 +80,7 @@ F("head", F.Component.extend({
   }
 }));
 ```
-* FractalJS will pass **this.data** as parameter of **header.tmpl** to rendering engine.
+* FractalJS will pass **this.data** as parameters when rendering **header.tmpl**.
 
 templates/head.tmpl
 
@@ -92,7 +88,7 @@ templates/head.tmpl
 <h1>Hello {{text}}!</h1>
 ```
 
-### Define *body* component ###
+### Define the *body* component ###
 
 components/body.js
 
@@ -110,7 +106,7 @@ F("body", F.Component.extend({
   }
 }));
 ```
-* FractalJS will pass **this.data** as parameter of **header.tmpl** to rendering engine.
+* FractalJS will pass **this.data** as parameters when rendering **body.tmpl**.
 
 templates/body.tmpl
 
