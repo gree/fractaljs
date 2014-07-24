@@ -1,8 +1,8 @@
-### Login - Load other components on the fly ###
+### Login - load other components on the fly ###
 
 * **form** and **hello2** are children components of **login**.
-* Which one should be loaded will depend on the value of **componentName**.
+* **componentName** will determine what components will be loaded.
 * Multiple components/templates can be put together in 1 file.
-* FractalJS provides a simple Pub/Sub messaging function to let components communicate with each other.
-* **param** is available during the loading of the component including its childrens.
-* **hello**(in the first example), is reused here as a child of **hello2**.
+* FractalJS provides a simple Pub/Sub messaging function to allow components to communicate with each other.
+* **param** of the component and its children can be accessed during loading.
+* **hello** (in the first example), is reused here as a child of **hello2**.

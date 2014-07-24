@@ -1,14 +1,6 @@
-This page lists all user APIs of FractalJS.
-It will be *uncompleted* for a long time. ...
-
-Because FractalJS is still under active development,
-
-and more important,
-
-**fractal.js** is small, we will try our best to keep it small enough
-so that it is always faster to look into the code to know how it works.
-
-... I will update this when I am REALLY free.
+This page lists all the APIs available for FractalJS.
+For now, this list will not be actively maintained so it may be slightly inaccurate at times as FractalJS is still under active development.
+As **fractal.js** is tiny (and we intend to keep it that way) we recommend that you look inside the code directly instead.
 
 ## fractal.js ##
 
