@@ -1,0 +1,25 @@
+{
+  "name": "FractalJS",
+  "version": "1.0.0",
+  "description": "A Front-end Javascript Library to Help Breaking a Large Web Application into Small Parts and Organize Them Together.",
+  "main": "src/fractal.js",
+  "license": "MIT",
+  "homepage": "http://gree.github.io/fractaljs/",
+  "ignore": [
+    "docs",
+    "examples",
+    "test",
+    "*.md",
+    "*.html"
+  ],
+  "_release": "1.0.0",
+  "_resolution": {
+    "type": "version",
+    "tag": "1.0.0",
+    "commit": "3b14cb5e29f712034b2c39797da2d867c89be020"
+  },
+  "_source": "git://github.com/gree/fractaljs.git",
+  "_target": "~1.0.0",
+  "_originalSource": "fractaljs",
+  "_direct": true
+}
