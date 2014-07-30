@@ -5,6 +5,7 @@ F("body", F.Components.Router.extend({
     start: true,
     doc: true,
     examples: true,
+    tutorials: true,
     home: true
   },
   getComponentName: function(changed, cb) {

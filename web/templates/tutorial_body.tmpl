@@ -1,0 +1,36 @@
+<h1>{{name}}</h1>
+
+<div class="row">
+  <ul id="tab-{{name}}" class="nav nav-tabs" role="tablist">
+    <li>
+      <a href="#tab-pane-files" role="tab" data-toggle="tab">FILES</a>
+    </li>
+    {{#files}}
+    <li{{#active}} class="active"{{/active}}>
+      <a href="#tab-pane-{{idName}}" role="tab" data-toggle="tab">{{displayName}}</a>
+    </li>
+    {{/files}}
+  </ul>
+  <div id="tab-content-{{name}}" class="tab-content">
+    <div class="tab-pane fade in" id="tab-pane-files">
+      <br/>
+      <pre>{{fileStructure}}</pre>
+    </div>
+    {{#files}}
+    <div class="tab-pane fade in{{#active}} active{{/active}}" id="tab-pane-{{idName}}">
+      <textarea rows="{{rows}}">{{contents}}</textarea>
+    </div>
+    {{/files}}
+  </div>
+</div>
+
+<div class="row">
+  <div class="panel panel-default">
+    <div class="panel-heading">Result in an IFRAME ( <a href="{{startUrl}}">{{startUrl}}</a> )</div>
+    <div class="panel-body">
+      <iframe width="100%" height="{{resultHeight}}" src="{{startUrl}}">
+      </iframe>
+    </div>
+  </div>
+</div>
+
