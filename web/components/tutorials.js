@@ -38,7 +38,7 @@ F(function(){
     },
     {
       name: "Dom Event Handling",
-      basePath: "tutorials/domevent/",
+      basePath: "tutorials/dom_event/",
       files: [
         "index.html",
         "components/dom_event.js",
@@ -47,8 +47,8 @@ F(function(){
       resultHeight: "50px"
     },
     {
-      name: "Setting Data From API",
-      basePath: "tutorials/api/",
+      name: "Data From API",
+      basePath: "tutorials/github_activities/",
       files: [
         "index.html",
         "components/github_activities.js",
@@ -56,6 +56,32 @@ F(function(){
       ],
       resultHeight: "200px"
     },
+    {
+      name: "4 and 5",
+      basePath: "tutorials/github_zen/",
+      files: [
+        "index.html",
+        "components/github_zen.js",
+        "templates/github_zen.tmpl",
+      ],
+      resultHeight: "50px"
+    },
+    {
+      name: "advanced",
+      basePath: "tutorials/github_activities/",
+      files: [
+        "index2.html",
+        "components/main.js",
+        "components/menu.js",
+        "components/github_activities2.js",
+        "components/github_profile.js",
+        "templates/main.tmpl",
+        "templates/menu.tmpl",
+        "templates/github_activities2.tmpl",
+        "templates/github_profile.tmpl",
+      ],
+      resultHeight: "200px"
+    }
   ];
   var tutorialByName = {};
   tutorials.forEach(function(v){ tutorialByName[v.name] = v });
@@ -104,7 +130,7 @@ F(function(){
         });
         self.data = {
           name: name,
-          startUrl: basePath + "index.html",
+          startUrl: files[0].url,
           files: files,
           resultHeight: resultHeight,
           fileStructure: tutorial.files.join("\n")

@@ -3,11 +3,9 @@ F("github_activities", F.Component.extend({
     var self = this;
     F.require("https://api.github.com/repos/gree/fractaljs/events", function(data){
       self.data = {
-        activities: data
+        activities: data.filter(function(v){ return v.type == "CreateEvent" }),
         desc: function(){
-          if (this.type == "CreateEvent") {
-            
-          }
+          return "created " + this.payload.ref_type + " " + (this.payload.ref || "");
         }
       };
       cb();

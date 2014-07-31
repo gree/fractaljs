@@ -1,1 +1,1 @@
-F("hello", F.Component.extend({}));
+F("hello2", F.Component.extend({}));
