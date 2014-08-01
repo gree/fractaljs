@@ -48,7 +48,7 @@
       {{#hasTodos}}
 			<footer id="footer">
 				<!-- This should be `0 items left` by default -->
-				<span id="todo-count"><strong>{{nbTodo}}</strong> item left</span>
+				<span id="todo-count"><strong>{{nbTodo}}</strong> item{{#plural}}s{{/plural}} left</span>
 				<!-- Remove this if you don't implement routing -->
 				<ul id="filters">
 					<li>
@@ -75,6 +75,8 @@
 			<p>Created by <a href="https://github.com/lulurun">lulurun</a></p>
 			<p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
 		</footer>
+		<!-- Scripts here. Don't remove this ↓ -->
+		<!-- <script src="bower_components/todomvc-common/base.js"></script> -->
     <script src="bower_components/fractaljs/src/fractal.js"></script>
     <script src="bower_components/fractaljs/src/fractal.app.js"></script>
 		<script src="js/app.js"></script>

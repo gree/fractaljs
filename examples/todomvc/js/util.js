@@ -1,57 +1,62 @@
 (function( window ) {
 	'use strict';
 
-	// Your starting point. Enjoy the ride!
   var Store = (function(){
     var __seq = 0;
     var Store = function(){
-      this.name = "OBJLIST." + (++__seq);
-      this.topic = this.name + ".updated";
+      this.dataKey = "todo-fractaljs-" + (++__seq);
+      this.idKey = this.dataKey + ".last";
+      this.topic = this.dataKey + ".updated";
       this.getAll();
     };
     var proto = Store.prototype;
     proto.getAll = function() {
       if (!this.data) {
-        var data = localStorage.getItem(this.name);
+        var data = localStorage.getItem(this.dataKey);
         if (data) data = JSON.parse(data);
         this.data = data || [];
       }
       return this.data;
     };
     var sync = function() {
-      localStorage.setItem(this.name, JSON.stringify(this.data));
+      localStorage.setItem(this.dataKey, JSON.stringify(this.data));
       Fractal.Pubsub.publish(this.topic, this.data);
     };
+    proto.nextId = function(){
+      var id = localStorage.getItem(this.idKey);
+      localStorage.setItem(this.idKey, ++id);
+      return id;
+    };
     proto.insert = function(item) {
-      var id = this.data.length;
+      var id = this.nextId();
       item._id = id;
-      this.data[id] = item;
+      this.data.push(item);
       sync.bind(this)();
     };
     proto.update = function(idList, key, value) {
       if (!Array.isArray(idList)) idList = [idList];
+      var idMap = {};
+      var i = 0, len = idList.length;
+      for(; i<len; ++i) {
+        idMap[idList[i]] = true;
+      }
       var i = 0, len = this.data.length;
       for (; i<len; ++i) {
-        var id = idList[i];
-        var j = 0;
-        for (; j<this.data.length; ++j) {
-          if (this.data[j]._id == id) {
-            this.data[j][key] = value;
-            break;
-          }
+        if (this.data[i]._id in idMap) {
+          this.data[i][key] = value;
         }
       }
       sync.bind(this)();
     };
     proto.remove = function(idList) {
       if (!Array.isArray(idList)) idList = [idList];
-      var i = 0, len = idList.length;
-      for (; i<len; ++i) {
+      var i = 0, ilen = idList.length;
+      for(; i<ilen; ++i) {
         var id = idList[i];
-        var j = 0;
-        for (; j<this.data.length; ++j) {
+        var j = 0, jlen = this.data.length;
+        for (; j<jlen; ++j) {
           if (this.data[j]._id == id) {
-            this.data.splice(j, 1); // we only do 1 splice, so it is safe
+            this.data.splice(j, 1); // safe to do 1 splice and break
             break;
           }
         }
@@ -67,5 +72,8 @@
     var store = new Store();
     return function() { return store; };
   })();
+
+  window.ENTER_KEY = 13;
+  window.ESCAPE_KEY = 27;
 
 })( window );
