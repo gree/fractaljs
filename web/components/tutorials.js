@@ -67,7 +67,18 @@ F(function(){
       resultHeight: "50px"
     },
     {
-      name: "advanced",
+      name: "Importing External Files",
+      basePath: "tutorials/markdown/",
+      files: [
+        "index.html",
+        "components/markdown.js",
+        "templates/markdown.tmpl",
+        "../../docs/heading1.md",
+      ],
+      resultHeight: "300px"
+    },
+    {
+      name: "Advanced",
       basePath: "tutorials/github_activities/",
       files: [
         "index2.html",
@@ -81,7 +92,16 @@ F(function(){
         "templates/github_profile.tmpl",
       ],
       resultHeight: "200px"
-    }
+    },
+    {
+      name: "Working with Angularjs",
+      basePath: "tutorials/angularjs/",
+      files: [
+        "index.html",
+        "components/angularjs.js",
+        "templates/angularjs.tmpl",
+      ]
+    },
   ];
   var tutorialByName = {};
   tutorials.forEach(function(v){ tutorialByName[v.name] = v });
