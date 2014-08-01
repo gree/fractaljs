@@ -1,6 +1,7 @@
 F("header", F.Component.extend({
   menuItems: {
     "?start": "Getting Started",
+    "?tutorials": "Tutorials",
     "?examples": "Examples",
     "?doc": "Doc",
     "https://github.com/gree/fractaljs": "Github",

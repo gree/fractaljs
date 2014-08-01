@@ -1,0 +1,20 @@
+<table class="table">
+  <thead>
+    <tr>
+      <th>Actor</th>
+      <th>Action</th>
+      <th>Time</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#activities}}
+    <tr>
+      <td>
+        <button class="showProfile" data-name="{{actor.login}}">{{actor.login}}</button>
+      </td>
+      <td>{{desc}}</td>
+      <td>{{created_at}}</td>
+    </tr>
+    {{/activities}}
+  <tbody>
+</table>

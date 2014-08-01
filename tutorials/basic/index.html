@@ -1,0 +1,17 @@
+<html>
+  <head>
+    <title>Fractal</title>
+  </head>
+  <body>
+    <div data-role="component" data-name="hello" load-once="true"></div>
+    <div data-role="component" data-name="world" load-once="true"></div>
+
+    <script type="text/javascript" src="../../src/fractal.js"></script>
+    <script>
+      F.PREFIX.component = "components/";
+      F.PREFIX.template = "templates/";
+      F.construct();
+    </script>
+  </body>
+</html>
+
