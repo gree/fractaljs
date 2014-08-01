@@ -40,9 +40,34 @@ F("main", F.Component.extend({
     self.$(".destroy").click(function(){
       self.store.remove(getId.bind(this)());
     });
+    (function(){
+      var update = function(item){
+        var value = $(item).val().trim();
+        if (value) self.store.update(getId.bind(item)(), "value", value);
+        else self.store.remove(getId.bind(item)());
+      };
+      self.$("#todo-list li").dblclick(function(){
+        $(this).addClass("editing");
+        var $edit = $(this).find(".edit");
+        $edit.data("before", $edit.val());
+        $edit.focus();
+        $edit.select();
+      });
+      self.$("#todo-list li .edit").blur(function(){
+        update(this);
+      });
+      self.$("#todo-list li .edit").keydown(function(event){
+        if (event.keyCode == ENTER_KEY) update(this);
+        else if (event.keyCode == ESCAPE_KEY) {
+          $(this).closest("li").removeClass("editing");
+          $(this).val($(this).data("before"));
+        }
+      });
+    })();
     callback();
   },
   getData: function(callback){
+    var self = this;
     var data = this.store.getAll();
     var f = this.filter;
     var filtered = f ? data.filter(function(v){ return v[f.key] == f.value; }) : data;

@@ -17,16 +17,18 @@ Fractal("footer", Fractal.Component.extend({
     });
     self.$("#clear-completed").click(function(){
       var data = self.store.getAll();
-      var idList = data.filter(function(v){ return v.completed }).map(function(v){ return v._id; });
+      var idList = data.filter(function(v){ return v.completed }).map(function(v){ return v._id });
       self.store.remove(idList);
     });
     callback();
   },
   getData: function(callback){
     var data = this.store.getAll();
+    var nbTodo = data.filter(function(v){ return !v.completed }).length;
     this.data = {
       hasTodos: data.length > 0,
-      nbTodo: data.filter(function(v){ return !v.completed }).length,
+      nbTodo: nbTodo,
+      plural: nbTodo != 1,
       nbCompleted: data.filter(function(v){ return v.completed }).length
     };
     callback();

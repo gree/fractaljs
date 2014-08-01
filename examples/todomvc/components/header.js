@@ -3,7 +3,7 @@ F("header", F.Component.extend({
     var self = this;
     var $input = self.$("#new-todo");
     $input.keydown(function(event){
-      if (event.keyCode == "13") { // 13: enter
+      if (event.keyCode == ENTER_KEY) {
         var value = $input.val().trim();
         if (value) GetStore().insert({ completed: false, value: value });
         $input.val("");

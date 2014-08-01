@@ -8,7 +8,7 @@
         component: "components/",
         template: "templates/",
       };
-      this.REQUIRE_LIST = [ "js/store.js" ];
+      this.REQUIRE_LIST = [ "js/util.js" ];
     },
   });
 
