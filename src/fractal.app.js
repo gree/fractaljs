@@ -89,7 +89,6 @@ Fractal(function(){
       var self = this;
       self._super(name, $container);
       self.subscribe(Fractal.TOPIC.ENV_CHANGED, function(topic, data){
-        if (!self.rendered) return;
         self.getComponentName(data, function(componentName){
           if (!componentName) return;
           if (self.data && self.data.componentName !== componentName) {

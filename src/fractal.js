@@ -189,6 +189,10 @@
     })();
 
     return function(resourceList, options, callback) {
+      if (typeof(options) === "function") {
+        callback = options;
+        options = null;
+      }
       var wantarray = true;
       if (typeof(resourceList) === "string") {
         wantarray = false;
@@ -198,10 +202,6 @@
           if (callback) callback({});
           return;
         }
-      }
-      if (typeof(options) === "function") {
-        callback = options;
-        options = null;
       }
       var total = resourceList.length;
       var complete = 0;
