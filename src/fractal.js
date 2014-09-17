@@ -1,56 +1,101 @@
 (function(window){
-  var Fractal = function(arg1, arg2){
+  var ready = false;
+  var readyListeners = [];
+
+  var F = window.Fractal = window.F = function(arg1, arg2){
     var callback = null;
-    if (typeof(arg1) === 'function') { // register a onReady callback
+    if (typeof(arg1) === 'function') { // register a 'onReady' listener
       callback = arg1
     } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') { // add a component
       var name = arg1, component = arg2;
-      callback = function(){ Fractal.Components[name] = component; };
+      callback = function(){ F.Components[name] = component; };
     }
     if (!callback) return;
-    if (Fractal.__ready) return callback();
-    if (!Fractal.__startup) Fractal.__startup = [];
-    Fractal.__startup.push(callback);
+    if (ready) return callback();
+    readyListeners.push(callback);
   };
-  window.Fractal = Fractal;
-  window.F = Fractal; // alias
 
-  Fractal.ready =  function(){
-    Fractal.ready = null;
-    Fractal.__ready = true;
-    if (Fractal.__startup) {
-      Fractal.__startup.forEach(function(v){ v(); });
-      Fractal.__startup = [];
-    }
-  };
-  // Settings
-  Fractal.API_ROOT = window.location.pathname.split("/").slice(0, -1).join("/") + "/";
-  Fractal.SOURCE_ROOT = Fractal.API_ROOT;
-  var protocol = window.location.protocol == "file:" ? "http:" : window.location.protocol;
-  Fractal.DOM_PARSER = protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js";
-  Fractal.TEMPLATE_ENGINE = protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js";
-  Fractal.TOPIC = {
+  F.Components = {};
+  F.TOPIC = {
     COMPONENT_LOADED_MYSELF: "Fractal.component.loaded.myself",
     COMPONENT_LOADED_CHILDREN: "Fractal.component.loaded.children",
   };
-  Fractal.PREFIX = {}; // component, template
-  Fractal.Compile = function(templateText) { return Hogan.compile(templateText); };
-  Fractal.Render = function(template, data, options) { return template.render(data, options); };
 
-  var Seq = {
-    __seq: 1,
-    __last: (+new Date),
-    get: function(){ return Seq.__seq; },
-    increment: function(){
-      var now = +new Date;
-      if (now - Seq.__last > 100) {
-        ++Seq.__seq;
-        Seq.__last = now;
+  F.Loader = (function(){
+    var KNOWN_TYPES = {js: 1, css:1, tmp:1};
+    var loader = function(){
+      this.nameSpace = '';
+      this.API_ROOT = window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+      this.SOURCE_ROOT = this.API_ROOT;
+      var protocol = window.location.protocol == 'file:' ? 'http:' : window.location.protocol;
+      this.DOM_PARSER = protocol + '//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js';
+      this.TEMPLATE_ENGINE = protocol + '//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js';
+      this.PREFIX = {
+        component: 'components/',
+        template: 'templates/',
+      };
+
+      this.seq = {
+        __seq: 1,
+        __last: (+new Date),
+        get: function(){ return Seq.__seq; },
+        increment: function(){
+          var now = +new Date;
+          if (now - Seq.__last > 100) {
+            ++Seq.__seq;
+            Seq.__last = now;
+          }
+        },
+      };
+    };
+
+    loader.prototype.Compile = function(templateText) {
+      return Hogan.compile(templateText);
+    };
+
+    loader.prototype.Render = function(template, data, options) {
+      return template.render(data, options);
+    };
+
+    loader.prototype.getTemplate = (function(){
+      var self = this;
+      var __get = function(name, callback){
+        // where to put namespace
+        var $tmpl = $('script[type="text/template"][data-name="' + self.nameSpace + ':' + name + '"]');
+        if ($tmpl.length > 0) {
+          callback(self.Compile($tmpl.html()));
+        } else {
+          self.get(self.PREFIX.template + name + ".tmpl", function(data){
+            callback(self.Compile(data));
+          });
+        }
+      };
+      return function(names, callback){
+        if (typeof(names) === "string") return __get(names, callback);
+        var results = {}, total = names.length, complete = 0;
+        names.forEach(function(v){
+          __get(v, function(data){
+            results[v] = data;
+            if (++complete === total) callback(results);
+          });
+        });
+      };
+    })();
+
+    loader.prototype.getUrl = function(name) {
+      if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
+      var type = name.split('.').pop();
+      type = (type in KNOWN_TYPES) ? type : 'ajax';
+      if (name.indexOf(".") === 0) {
+        if (type === 'ajax') throw new Error('relative path is not allow for ajax calls');
       }
-    },
-  };
+      var base = (type === 'ajax') ? this.API_ROOT : this.SOURCE_ROOT;
+      if (name.indexOf("/") === 0) name = name.slice(1);
+      return base + name;
+    };
+  })();
   // get external resources
-  Fractal.require = (function(){
+  F.require = (function(){
     var byAddingElement = function(element, callback) {
       var __myTimer = setTimeout(function(){
         console.error("Timeout: adding " + element.src);
@@ -217,7 +262,7 @@
     };
   })();
   // Objects
-  Fractal.Class = (function(){
+  F.Class = (function(){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
      * MIT Licensed.
@@ -264,29 +309,7 @@
 
     return Class;
   })();
-  Fractal.getTemplate = (function(){
-    var __get = function(templateName, callback){
-      var $template = $('script[type="text/template"][id="template-' + templateName + '"]');
-      if ($template.length > 0) {
-        callback(Fractal.Compile($template.html()));
-      } else {
-        Fractal.require(templateName + ".tmpl", function(template){
-          callback(Fractal.Compile(template));
-        });
-      }
-    };
-    return function(templateNames, callback){
-      if (typeof(templateNames) === "string") return __get(templateNames, callback);
-      var results = {}, total = templateNames.length, complete = 0;
-      templateNames.forEach(function(v){
-        __get(v, function(data){
-          results[v] = data;
-          if (++complete === total) callback(results);
-        });
-      });
-    };
-  })();
-  Fractal.Component = (function(){
+  F.Component = (function(){
     var ComponentFilter = '[data-role=component]';
     var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
 
@@ -305,9 +328,11 @@
     };
 
     var Component = {};
-    Component.init = function(name, $container){
+    Component.init = function(name, $container, loader){
       this.name = name;
       this.$container = $container;
+      this.F = loader;
+
       this.$ = this.$container.find.bind(this.$container);
       var resetDisplay = this.$container.data("display");
       if (resetDisplay) this.$container.css("display", resetDisplay);
@@ -323,7 +348,7 @@
       // self.children = [];
       // self.parent = null;
       this.templateName = this.templateName || self.name;
-      if (typeof(this.template) === "string") this.template = Fractal.Compile(this.template);
+      if (typeof(this.template) === "string") this.template = this.F.Compile(this.template);
 
       setLoad(this, this.getData);
       setLoad(this, this.getTemplate);
@@ -349,13 +374,13 @@
     Component.getTemplate = function(callback) {
       var self = this;
       if (self.template) return callback();
-      Fractal.getTemplate(self.templateName || self.name, function(template){
+      this.F.getTemplate(self.templateName || self.name, function(template){
         self.template = template;
         callback();
       });
     };
     Component.render = function(callback){
-      var contents = Fractal.Render(this.template, this.data, this.partials);
+      var contents = this.F.Render(this.template, this.data, this.partials);
       if (this.loadOnce) {
         this.$contents = $($.parseHTML(contents));
         this.$container.replaceWith(this.$contents);
@@ -373,7 +398,7 @@
         v.callback(v.topic, v.data);
       }
       if (this.loadOnce) this.load = null;
-      Fractal.Pubsub.publish(Fractal.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
+      F.Pubsub.publish(F.TOPIC.COMPONENT_LOADED_MYSELF, {name: this.name});
       callback();
     };
     Component.loadChildren = function(callback, param){
@@ -420,37 +445,37 @@
     Component.onAllLoaded = null;
     Component.unload = function(){ this.unsubscribe(); };
 
-    Component.publish = function(topic, data) { Fractal.Pubsub.publish(topic, data); };
+    Component.publish = function(topic, data) { F.Pubsub.publish(topic, data); };
     Component.subscribe = function(topic, callback){
       var self = this;
-      self.subscribeList[topic] = Fractal.Pubsub.subscribe(topic, function(topic, data){
+      self.subscribeList[topic] = F.Pubsub.subscribe(topic, function(topic, data){
         if (self.rendered) callback(topic, data);
         else self.earlyRecieved.push({topic: topic, data: data, callback: callback});
       });
     };
     Component.unsubscribe = function(topic) {
       if (!topic) {
-        for (var i in this.subscribeList) Fractal.Pubsub.unsubscribe(i, this.subscribeList[i]);
+        for (var i in this.subscribeList) F.Pubsub.unsubscribe(i, this.subscribeList[i]);
       } else {
-        if (topic in this.subscribeList) Fractal.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in this.subscribeList) F.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     };
-    Fractal.Components = {};
-    return Fractal.Class.extend(Component);
+    return F.Class.extend(Component);
   })();
-  Fractal.construct = function(callback){
-    Fractal.require([Fractal.DOM_PARSER, Fractal.TEMPLATE_ENGINE], function(){
+
+  F.construct = function(callback){
+    F.require([F.DOM_PARSER, F.TEMPLATE_ENGINE], function(){
       $.event.special.destroyed = {
         remove: function(o) {
           if (o.handler) o.handler();
         }
       }
-      var c = new Fractal.Component("__ROOT__", $(document));
+      var c = new F.Component("__ROOT__", $(document));
       c.loadChildren(callback);
     });
   };
   // pub-sub
-  Fractal.Pubsub = (function() {
+  F.Pubsub = (function() {
     var Stock = function(){
       this.arrived = {};
       this.buffer = {};
@@ -523,5 +548,12 @@
     };
   }());
 
-  Fractal.ready();
+  ready = (function() {
+    if (readyListeners && readyListeners.length) {
+      readyListeners.forEach(function(v){ v(); });
+      readyListeners = [];
+    }
+    return true;
+  })();
 })(window);
+
