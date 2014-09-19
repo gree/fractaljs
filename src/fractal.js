@@ -4,22 +4,24 @@
 
   var F = global.Fractal = global.F = function(arg1, arg2){
     var callback = null;
-    if (typeof(arg1) === 'function') { // register a 'onReady' listener
-      callback = arg1
-    } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') { // add a component
+
+    if (typeof(arg1) === 'function') {
+      callback = arg1;
+    } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') {
       var name = arg1, component = arg2;
       callback = function(){
         ComponentLoader.define(name, component);
       };
     }
+
     if (!callback) return;
     if (ready) return callback();
     readyListeners.push(callback);
   };
 
   F.TOPIC = {
-    COMPONENT_LOADED_MYSELF: "Fractal.component.loaded.myself",
-    COMPONENT_LOADED_CHILDREN: "Fractal.component.loaded.children",
+    COMPONENT_LOADED_MYSELF: "component.loaded.myself",
+    COMPONENT_LOADED_CHILDREN: "component.loaded.children",
   };
 
   var forEachAsync = function(items, onEach, onDone) {
@@ -49,19 +51,33 @@
       }
       components = {};
       F.require(url, function(){
+        var asyncCalls = [];
         for (var i in components) {
-          console.info('load', i, 'into namespace', env.namespace);
-          env.components[i] = components[i];
+          if (components[i].prototype && components[i].prototype.constructor.name === 'Class') {
+            console.info('load', i, 'into namespace', env.namespace);
+            env.components[i] = components[i];
+          } else {
+            asyncCalls.push([i, components[i]]);
+          }
         }
-        callback();
-        components = null;
-        next();
+        forEachAsync(asyncCalls, function(v, cb){
+          var name = v[0];
+          var func = v[1];
+          func(env, function(componentClass){
+            console.info('load', name, 'into namespace', env.namespace);
+            env.components[name] = componentClass;
+            cb();
+          });
+        }, function(){
+          callback();
+
+          components = null;
+          if (requireQueue.length) {
+            requireQueue.shift()();
+          }
+        });
+
       });
-    };
-    var next = function(){
-      if (requireQueue.length) {
-        requireQueue.shift()();
-      }
     };
     return {
       define: define,
@@ -158,23 +174,6 @@
   var Env = (function(){
     var KNOWN_TYPES = {js: 1, css:1, tmpl:1};
 
-    var protocol = global.location.protocol == 'file:' ? 'http:' : global.location.protocol;
-    var root = global.location.pathname.split('/').slice(0, -1).join('/') + '/';
-    var defaultConfig = {
-      API_ROOT: root,
-      SOURCE_ROOT: root,
-      DOM_PARSER: protocol + '//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js',
-      TEMPLATE_ENGINE: protocol + '//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js',
-      PREFIX: {
-        component: 'components/',
-        template: 'templates/',
-      },
-      Template: {
-        Compile: function(templateText) { return Hogan.compile(templateText); },
-        Render: function(template, data, options) { return template.render(data, options); },
-      },
-    };
-
     var getUrl = function(self, name) {
       var type = name.split('.').pop();
       type = (type in KNOWN_TYPES) ? type : 'ajax';
@@ -191,30 +190,41 @@
     };
 
     var Env = function(namespace, config){
-      config = config || defaultConfig;
       this.namespace = namespace;
       this.components = {};
-      this.PREFIX = {};
-      this.Template = {};
-      this.setup(config);
+      config = config || {};
+      var protocol = global.location.protocol == 'file:' ? 'http:' : global.location.protocol;
+      var root = global.location.pathname.split('/').slice(0, -1).join('/') + '/';
+      this.API_ROOT = config.API_ROOT || root;
+      this.SOURCE_ROOT = config.SOURCE_ROOT || root;
+      this.DOM_PARSER = config.DOM_PARSER ||
+        protocol + '//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js';
+      this.TEMPLATE_ENGINE = config.TEMPLATE_ENGINE ||
+        protocol + '//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js';
+      this.PREFIX = {
+        component: (config.PREFIX && config.PREFIX.component) || 'components/',
+        template: (config.PREFIX && config.PREFIX.template) || 'templates/',
+      };
+      this.REQUIRES = config.REQUIRES || [];
+      this.Template = {
+        Compile: (config.Template && config.Template.Compile) ||
+          function(templateText) { return Hogan.compile(templateText); },
+        Render: (config.Template && config.Template.Render) ||
+          function(template, data, options) { return template.render(data, options); },
+      };
     };
     var proto = Env.prototype;
-    proto.setup = function(config){
-      if (config.API_ROOT) this.API_ROOT = config.API_ROOT;
-      if (config.SOURCE_ROOT) this.SOURCE_ROOT = config.SOURCE_ROOT;
-      if (config.DOM_PARSER) this.DOM_PARSER = config.DOM_PARSER;
-      if (config.TEMPLATE_ENGINE) this.TEMPLATE_ENGINE = config.TEMPLATE_ENGINE;
-      if (config.PREFIX) for (var i in config.PREFIX) this.PREFIX[i] = config.PREFIX[i];
-      if (config.Template) for (var i in config.Template) this.Template[i] = config.Template[i];
-    };
     proto.init = function(callback) {
-      this.require([this.DOM_PARSER, this.TEMPLATE_ENGINE], function(){
+      var self = this;
+      self.require([self.DOM_PARSER, self.TEMPLATE_ENGINE], function(){
         $.event.special.destroyed = {
           remove: function(o) {
             if (o.handler) o.handler();
           }
         };
-        callback();
+        self.require(self.REQUIRES, function(){
+          callback();
+        });
       });
     };
     proto.require = function(names, callback){
@@ -255,6 +265,9 @@
       } else {
         var url = getUrl(self, self.PREFIX.component + name + '.js');
         ComponentLoader.require(self, url, function(){
+          if (!(name in self.components)) {
+            throw new Error('component ' + name + ' is not found in ' + url.url );
+          }
           callback(self.components[name]);
         });
       }
@@ -482,7 +495,7 @@
       // self.children = [];
       // self.parent = null;
       this.templateName = this.templateName || self.name;
-      if (typeof(this.template) === "string") this.template = this.F.Compile(this.template);
+      if (typeof(this.template) === "string") this.template = this.F.Template.Compile(this.template);
 
       setLoad(this, this.getData);
       setLoad(this, this.getTemplate);
@@ -557,9 +570,13 @@
       })
     },
     Component.onAllLoaded = null;
-    Component.unload = function(){ this.unsubscribe(); };
+    Component.unload = function(){
+      this.unsubscribe();
+    };
 
-    Component.publish = function(topic, data) { Pubsub.publish(topic, { from: this, data: data }); };
+    Component.publish = function(topic, data) {
+      Pubsub.publish(topic, { from: this, data: data });
+    };
     Component.subscribe = function(topic, callback){
       var self = this;
       self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data){
@@ -576,6 +593,15 @@
     };
     return F.Class.extend(Component);
   })();
+
+  F.namespace = function(name, config) {
+    if (typeof(config) === 'function') {
+      config(function(config){
+        F.namespace[name] = config;
+      });
+    }
+    F.namespaces[name] = config;
+  };
 
   var getOrCreateEnv = (function(){
     var envs = {};
