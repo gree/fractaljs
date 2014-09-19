@@ -1,14 +1,16 @@
-(function(window){
+(function(global){
   var ready = false;
   var readyListeners = [];
 
-  var F = window.Fractal = window.F = function(arg1, arg2){
+  var F = global.Fractal = global.F = function(arg1, arg2){
     var callback = null;
     if (typeof(arg1) === 'function') { // register a 'onReady' listener
       callback = arg1
     } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') { // add a component
       var name = arg1, component = arg2;
-      callback = function(){ F.Components[name] = component; }; // TODO ...
+      callback = function(){
+        ComponentLoader.define(name, component);
+      };
     }
     if (!callback) return;
     if (ready) return callback();
@@ -30,6 +32,42 @@
       });
     }
   };
+
+  var ComponentLoader = (function(){
+    var components = null;
+    var requireQueue = [];
+
+    var define = function(name, component) {
+      if (!components) F.defaultEnv.components[name] = component;
+      else components[name] = component;
+    };
+    var require = function(env, url, callback) {
+      if (components) {
+        return requireQueue.push(function(){
+          require(env, url, callback);
+        });
+      }
+      components = {};
+      F.require(url, function(){
+        for (var i in components) {
+          console.info('load', i, 'into namespace', env.namespace);
+          env.components[i] = components[i];
+        }
+        callback();
+        components = null;
+        next();
+      });
+    };
+    var next = function(){
+      if (requireQueue.length) {
+        requireQueue.shift()();
+      }
+    };
+    return {
+      define: define,
+      require: require,
+    };
+  })();
 
   var Seq = {
     __seq: 1,
@@ -118,15 +156,15 @@
   }());
 
   var Env = (function(){
-    var KNOWN_TYPES = {js: 1, css:1, tmp:1};
+    var KNOWN_TYPES = {js: 1, css:1, tmpl:1};
 
-    var protocol = window.location.protocol == 'file:' ? 'http:' : window.location.protocol;
-    var root = window.location.pathname.split('/').slice(0, -1).join('/') + '/';
+    var protocol = global.location.protocol == 'file:' ? 'http:' : global.location.protocol;
+    var root = global.location.pathname.split('/').slice(0, -1).join('/') + '/';
     var defaultConfig = {
-      API_ROOT: root
+      API_ROOT: root,
       SOURCE_ROOT: root,
       DOM_PARSER: protocol + '//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js',
-      TEMPLATE_ENGINE = protocol + '//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js',
+      TEMPLATE_ENGINE: protocol + '//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js',
       PREFIX: {
         component: 'components/',
         template: 'templates/',
@@ -135,6 +173,21 @@
         Compile: function(templateText) { return Hogan.compile(templateText); },
         Render: function(template, data, options) { return template.render(data, options); },
       },
+    };
+
+    var getUrl = function(self, name) {
+      var type = name.split('.').pop();
+      type = (type in KNOWN_TYPES) ? type : 'ajax';
+      var url = (function(type){
+        if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
+        if (name.indexOf(".") === 0) {
+          if (type === 'ajax') throw new Error('relative path is not allow for ajax calls');
+        }
+        var base = (type === 'ajax') ? self.API_ROOT : self.SOURCE_ROOT;
+        if (name.indexOf("/") === 0) name = name.slice(1);
+        return base + name;
+      })(type);
+      return { type: type, url: url };
     };
 
     var Env = function(namespace, config){
@@ -146,7 +199,7 @@
       this.setup(config);
     };
     var proto = Env.prototype;
-    proto.setup(config) = function(){
+    proto.setup = function(config){
       if (config.API_ROOT) this.API_ROOT = config.API_ROOT;
       if (config.SOURCE_ROOT) this.SOURCE_ROOT = config.SOURCE_ROOT;
       if (config.DOM_PARSER) this.DOM_PARSER = config.DOM_PARSER;
@@ -154,7 +207,6 @@
       if (config.PREFIX) for (var i in config.PREFIX) this.PREFIX[i] = config.PREFIX[i];
       if (config.Template) for (var i in config.Template) this.Template[i] = config.Template[i];
     };
-
     proto.init = function(callback) {
       this.require([this.DOM_PARSER, this.TEMPLATE_ENGINE], function(){
         $.event.special.destroyed = {
@@ -162,17 +214,19 @@
             if (o.handler) o.handler();
           }
         };
+        callback();
       });
     };
-
     proto.require = function(names, callback){
       var self = this;
-      require(names.map(function(v){ return self.getUrl(v); }), callback);
+      if (!Array.isArray(names)) {
+        F.require(getUrl(self, names), callback);
+      } else {
+        F.require(names.map(function(v){ return getUrl(self, v); }), callback);
+      }
     };
-
     proto.getTemplate = (function(){
-      var self = this;
-      var __get = function(name, callback){
+      var __get = function(self, name, callback){
         var $tmpl = $('script[type="text/template"][data-name="' + self.namespace + ':' + name + '"]');
         if ($tmpl.length > 0) {
           callback(self.Template.Compile($tmpl.html()));
@@ -183,41 +237,25 @@
         }
       };
       return function(names, callback){
-        if (typeof(names) === "string") return __get(names, callback);
+        var self = this;
+        if (typeof(names) === "string") return __get(self, names, callback);
         var results = {};
         forEachAsync(names, function(v, cb){
-          __get(v, function(data){
+          __get(self, v, function(data){
             results[v] = data;
             cb();
           });
         }, function(){ callback(results); });
       };
     })();
-
-    proto.getUrl = function(name) {
-      var type = name.split('.').pop();
-      type = (type in KNOWN_TYPES) ? type : 'ajax';
-      var url = (function(type){
-        if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
-        if (name.indexOf(".") === 0) {
-          if (type === 'ajax') throw new Error('relative path is not allow for ajax calls');
-        }
-        var base = (type === 'ajax') ? this.API_ROOT : this.SOURCE_ROOT;
-        if (name.indexOf("/") === 0) name = name.slice(1);
-        return base + name;
-      })(type);
-      return { type: type, url: url };
-    };
-
     proto.getComponentClass = function(name, callback){
       var self = this;
       if (name in self.components) {
         callback(self.components[name]);
       } else {
-        var url = self.getUrl(this.PREFIX.component + name + '.js');
-        F.require(url, function(c){
-          self.components[name] = c;
-          callback(c);
+        var url = getUrl(self, self.PREFIX.component + name + '.js');
+        ComponentLoader.require(self, url, function(){
+          callback(self.components[name]);
         });
       }
     };
@@ -225,7 +263,7 @@
     return Env;
   })();
 
-  var require = (function(){
+  F.require = (function(){
     var byAddingElement = function(element, callback) {
       var __myTimer = setTimeout(function(){
         console.error("Timeout: adding " + element.src);
@@ -284,10 +322,7 @@
           var el = document.createElement("link");
           el.rel="stylesheet";
           el.href = url;
-          // NOTE not using byAddingElement,
-          //      some broswers dont fire onreadystatechange event for css ...
-          var container = document.getElementsByTagName("head")[0];
-          container.appendChild(el);
+          document.getElementsByTagName("head")[0].appendChild(el);
           callback(false, true);
         };
       })(),
@@ -352,6 +387,9 @@
         callback = options;
         options = null;
       }
+      if (!Array.isArray(resourceList)) {
+        return requireDefault(resourceList, options, callback);
+      }
       var retData = {};
       forEachAsync(resourceList, function(v, cb){
         requireDefault(v, options, function(data){
@@ -411,7 +449,6 @@
   })();
   F.Component = (function(){
     var ComponentFilter = '[data-role=component]';
-    var getComponentJS = function(name) { return Fractal.PREFIX.component + name + ".js"; };
 
     var setLoad = function(self, next) {
       if (!next) return;
@@ -477,7 +514,7 @@
       });
     };
     Component.render = function(callback){
-      var contents = this.F.Render(this.template, this.data, this.partials);
+      var contents = this.F.Template.Render(this.template, this.data, this.partials);
       this.$container.html(contents);
       callback();
     };
@@ -487,19 +524,20 @@
       while (this.earlyRecieved.length > 0) {
         this.earlyRecieved.pop()();
       }
-      self.publish(F.TOPIC.COMPONENT_LOADED_MYSELF);
+      this.publish(F.TOPIC.COMPONENT_LOADED_MYSELF);
       callback();
     };
     Component.loadChildren = function(callback, param){
       var self = this;
-      var $components = self.$(ComponentFilter);
-      var len = $components.length;
+      var components = self.$(ComponentFilter);
+      var len = components.length;
       if (!len) {
         self.publish(F.TOPIC.COMPONENT_LOADED_CHILDREN);
         if (callback) callback();
         return;
       }
-      forEachAsync($components, function($container, cb){
+      forEachAsync(components, function(container, cb){
+        var $container = $(container);
         var namespace = '';
         var name = $container.data('name');
         if (name.indexOf(':') >= 0) {
@@ -508,8 +546,8 @@
           name = parts[1];
         }
         getOrCreateEnv(namespace, function(env){
-          env.getComponentClass(function(componentClass){
-            var c = new componentClass(name, $container);
+          env.getComponentClass(name, function(componentClass){
+            var c = new componentClass(name, $container, env);
             c.__load(cb, param);
           });
         });
@@ -542,14 +580,16 @@
   var getOrCreateEnv = (function(){
     var envs = {};
     return function(namespace, callback) {
-      if (!namespace) return F.defaultEnv;
+      if (!namespace) return callback(F.defaultEnv);
       if (namespace in envs) return callback(envs[namespace]);
       if (!(namespace in F.nsDescriptors)) throw new Error('unknown namspace: ' + namepspace);
       var descriptorUrl = F.nsDescriptors[namespace];
       F.defaultEnv.require(descriptorUrl, function(nsConfig){
         var env = new Env(nsConfig);
-        envs[namespace] = env;
-        callback(env);
+        env.init(function(){
+          envs[namespace] = env;
+          callback(env);
+        });
       });
     };
   })();
@@ -561,7 +601,7 @@
     }
     (function(config, cb){
       if (!F.defaultEnv) {
-        var env = new Env(config);
+        var env = new Env('default', config);
         env.init(function(){
           F.defaultEnv = env;
           cb(env);
@@ -570,7 +610,7 @@
         cb(F.defaultEnv);
       }
     })(config, function(env){
-      var c = new Component('__ROOT__', $(window.document), env);
+      var c = new F.Component('__ROOT__', $(global.document), env);
       c.loadChildren(callback);
     });
   };
