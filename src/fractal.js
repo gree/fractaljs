@@ -33,6 +33,14 @@
     COMPONENT_LOADED_CHILDREN: "component.loaded.children",
   };
 
+  var getType = (function(){
+    var KNOWN_TYPES = {js: 1, css:1, tmpl:1};
+    return function(name) {
+      var type = name.split('.').pop();
+      return (type in KNOWN_TYPES) ? type : 'ajax';
+    };
+  })();
+
   var forEachAsync = function(items, onEach, onDone) {
     var len = items.length;
     if (!len) return onDone();
@@ -74,9 +82,9 @@
 
     return {
       component: (function(){
-        var require = function(env, url, callback) {
+        var load = function(env, url, callback) {
           items.components = {};
-          F.require(url, function(){
+          require(url, {}, function(){
             var asyncCalls = [];
             for (var i in items.components) {
               var component = items.components[i];
@@ -102,11 +110,12 @@
         };
         return {
           define: function(name, component) {
-            items.components[name] = component;
+            if (!items) F.defaultEnv.components[name] = component;
+            else items.components[name] = component;
           },
-          require: function(env, url, callback) {
+          load: function(env, url, callback) {
             lockedCall(function(lockedCallback){
-              require(env, url, function(res){
+              load(env, url, function(res){
                 callback(res);
                 lockedCallback();
               });
@@ -115,9 +124,9 @@
         };
       })(),
       config: (function(){
-        var require = function(name, url, callback) {
+        var load = function(name, url, callback) {
           items.config = null;
-          F.require(url, function(){
+          require(url, {}, function(){
             if (!items.config) {
               console.warn('config not found in ' + url.url);
               console.warn('using default config for ' + name);
@@ -130,9 +139,9 @@
           define: function(config) {
             items.config = config;
           },
-          require: function(name, url, callback) {
+          load: function(name, url, callback) {
             lockedCall(function(lockedCallback){
-              require(name, url, function(res){
+              load(name, url, function(res){
                 callback(res);
                 lockedCallback();
               });
@@ -230,11 +239,8 @@
   }());
 
   var Env = (function(){
-    var KNOWN_TYPES = {js: 1, css:1, tmpl:1};
-
     var getUrl = function(self, name) {
-      var type = name.split('.').pop();
-      type = (type in KNOWN_TYPES) ? type : 'ajax';
+      var type = getType(name);
       var url = (function(type){
         if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
         if (name.indexOf(".") === 0) {
@@ -244,7 +250,7 @@
         if (name.indexOf("/") === 0) name = name.slice(1);
         return base + name;
       })(type);
-      return { type: type, url: url };
+      return { id: name, type: type, url: url };
     };
 
     var protocol = global.location.protocol == 'file:' ? 'http:' : global.location.protocol;
@@ -296,12 +302,16 @@
         });
       });
     };
-    proto.require = function(names, callback){
+    proto.require = function(names, options, callback){
+      if (typeof(options) === "function") {
+        callback = options;
+        options = {};
+      }
       var self = this;
       if (!Array.isArray(names)) {
-        F.require(getUrl(self, names), callback);
+        require(getUrl(self, names), options, callback);
       } else {
-        F.require(names.map(function(v){ return getUrl(self, v); }), callback);
+        require(names.map(function(v){ return getUrl(self, v); }), options, callback);
       }
     };
     proto.getTemplate = (function(){
@@ -342,7 +352,7 @@
           callback(self.components[name], name, self);
         } else {
           var url = getUrl(self, self.Prefix.Component + name + '.js');
-          ObjectLoader.component.require(self, url, function(loaded){
+          ObjectLoader.component.load(self, url, function(loaded){
             if (!(name in self.components)) {
               throw new Error('component ' + name + ' is not found in ' + url.url );
             }
@@ -355,7 +365,79 @@
     return Env;
   })();
 
-  F.require = (function(){
+  var Class = (function(){
+    /* Simple JavaScript Inheritance
+     * By John Resig http://ejohn.org/
+     * MIT Licensed.
+     */
+    // Inspired by base2 and Prototype
+    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
+    var Class = function(){};
+    Class.extend = function(prop) {
+      var _super = this.prototype;
+
+      initializing = true;
+      var prototype = new this();
+      initializing = false;
+
+      for (var name in prop) {
+        prototype[name] = typeof prop[name] == "function" &&
+          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
+          (function(name, fn){
+            return function() {
+              var tmp = this._super;
+              this._super = _super[name];
+
+              var ret = fn.apply(this, arguments);
+              this._super = tmp;
+
+              return ret;
+            };
+          })(name, prop[name]) :
+        prop[name];
+      }
+
+      function Class() {
+        if ( !initializing && this.init )
+          this.init.apply(this, arguments);
+      }
+
+      Class.prototype = prototype;
+      Class.prototype.constructor = Class;
+
+      Class.extend = arguments.callee;
+
+      return Class;
+    };
+
+    return Class;
+  })();
+
+  var getOrCreateEnv = (function(){
+    var envs = {};
+    return function(envName, callback) {
+      if (!envName) return callback(F.defaultEnv);
+      if (envName in envs) return callback(envs[envName]);
+      if (!(envName in F.envDescs)) throw new Error('unknown env name: ' + envName);
+
+      var onEnvLoaded = function(env) {
+        console.info('create env: ' + env.getName() + ' root: ' + env.SourceRoot);
+        envs[env.getName()] = env;
+        callback(env);
+      };
+
+      var descUrl = F.envDescs[envName];
+      var ext = descUrl.split('.').pop();
+      if (ext !== 'js') {
+        if (descUrl[descUrl.length - 1] !== '/') descUrl += '/';
+        (new Env(envName, descUrl)).init(onEnvLoaded);
+      } else {
+        ObjectLoader.config.load(envName, { type: 'js', url: descUrl }, onEnvLoaded);
+      }
+    };
+  })();
+
+  var require = (function(){
     var byAddingElement = function(element, callback) {
       var __myTimer = setTimeout(function(){
         console.error("Timeout: adding " + element.src);
@@ -420,7 +502,7 @@
       })(),
       "tmpl": (function(){
         var cache = {};
-        return function(url, options, callback) {
+        return function(url, callback, options) {
           if (url in cache) return callback(false, cache[url]);
           byAjax(url, options, function(err, result){
             if (!err) cache[url] = result;
@@ -466,79 +548,29 @@
           return;
         }
         listeners[resource.url] = [callback];
-        Type2Getter[resource.type](resource.url, function(err, data) {
+        var type = options.contentType ? 'ajax' : resource.type;
+        Type2Getter[type](resource.url, function(err, data) {
           var callbackList = listeners[resource.url].map(function(v){return v;});
           delete listeners[resource.url];
-          callbackList.forEach(function(v){v(data);});
+          callbackList.forEach(function(v){v(data, resource.id);});
         }, options);
       };
     })();
 
     return function(resourceList, options, callback) {
-      if (typeof(options) === "function") {
-        callback = options;
-        options = null;
-      }
       if (!Array.isArray(resourceList)) {
         return requireDefault(resourceList, options, callback);
       }
       var retData = {};
       forEachAsync(resourceList, function(v, cb){
-        requireDefault(v, options, function(data){
-          retData[v.url] = data;
+        requireDefault(v, options, function(data, id){
+          retData[id] = data;
           cb();
         });
       }, function(){ callback(retData); });
     };
   })();
 
-  F.Class = (function(){
-    /* Simple JavaScript Inheritance
-     * By John Resig http://ejohn.org/
-     * MIT Licensed.
-     */
-    // Inspired by base2 and Prototype
-    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
-    var Class = function(){};
-    Class.extend = function(prop) {
-      var _super = this.prototype;
-
-      initializing = true;
-      var prototype = new this();
-      initializing = false;
-
-      for (var name in prop) {
-        prototype[name] = typeof prop[name] == "function" &&
-          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-          (function(name, fn){
-            return function() {
-              var tmp = this._super;
-              this._super = _super[name];
-
-              var ret = fn.apply(this, arguments);
-              this._super = tmp;
-
-              return ret;
-            };
-          })(name, prop[name]) :
-        prop[name];
-      }
-
-      function Class() {
-        if ( !initializing && this.init )
-          this.init.apply(this, arguments);
-      }
-
-      Class.prototype = prototype;
-      Class.prototype.constructor = Class;
-
-      Class.extend = arguments.callee;
-
-      return Class;
-    };
-
-    return Class;
-  })();
   F.Component = (function(){
     var ComponentFilter = '[data-role=component]';
 
@@ -584,6 +616,12 @@
       if (!this.loadMyselfOnly)
         setLoad(this, this.loadChildren);
       setLoad(this, this.onAllLoaded);
+
+      for (var i in this) {
+        if (typeof(this[i]) === 'function' && i.indexOf('on') === 0) {
+          this.subscribe(i.substr(2), this[i].bind(this));
+        }
+      }
     };
     Component.setTemplate = function(name) {
       this.templateName = name;
@@ -645,6 +683,7 @@
       this.unsubscribe();
     };
 
+    Component.require = function(name, options, callback) { this.F.require(name, options, callback); };
     Component.publish = function(topic, data) {
       Pubsub.publish(topic, { from: this, data: data });
     };
@@ -662,31 +701,7 @@
         if (topic in this.subscribeList) Pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     };
-    return F.Class.extend(Component);
-  })();
-
-  var getOrCreateEnv = (function(){
-    var envs = {};
-    return function(envName, callback) {
-      if (!envName) return callback(F.defaultEnv);
-      if (envName in envs) return callback(envs[envName]);
-      if (!(envName in F.envDescs)) throw new Error('unknown env name: ' + envName);
-
-      var onEnvLoaded = function(env) {
-        console.info('create env: ' + env.getName() + ' root: ' + env.SourceRoot);
-        envs[env.getName()] = env;
-        callback(env);
-      };
-
-      var descUrl = F.envDescs[envName];
-      var ext = descUrl.split('.').pop();
-      if (ext !== 'js') {
-        if (descUrl[descUrl.length - 1] !== '/') descUrl += '/';
-        (new Env(envName, descUrl)).init(onEnvLoaded);
-      } else {
-        ObjectLoader.config.require(envName, { type: 'js', url: descUrl }, onEnvLoaded);
-      }
-    };
+    return Class.extend(Component);
   })();
 
   F.construct = function(config, callback){
@@ -705,15 +720,16 @@
         cb(F.defaultEnv);
       }
     })(config, function(env){
+      if (readyListeners && readyListeners.length) {
+        readyListeners.forEach(function(v){ v(); });
+        readyListeners = [];
+      }
+      ready =  true;
+
       var c = new F.Component('__ROOT__', $(global.document), env);
       c.loadChildren(callback);
     });
   };
 
-  if (readyListeners && readyListeners.length) {
-    readyListeners.forEach(function(v){ v(); });
-    readyListeners = [];
-  }
-  ready =  true;
 })(window);
 
