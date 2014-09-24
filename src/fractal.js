@@ -123,11 +123,7 @@
               console.warn('using default config for ' + name);
               items.config = {};
             }
-            console.info('create env ' + name);
-            var env = new Env(name, url.url, items.config);
-            env.init(function(){
-              callback(env);
-            });
+            (new Env(name, url.url, items.config)).init(callback);
           });
         };
         return {
@@ -296,7 +292,7 @@
           }
         };
         self.require(self.Requires, function(){
-          callback();
+          callback(self);
         });
       });
     };
@@ -334,16 +330,26 @@
     })();
     proto.getComponentClass = function(name, callback){
       var self = this;
-      if (name in self.components) {
-        callback(self.components[name]);
-      } else {
-        var url = getUrl(self, self.Prefix.Component + name + '.js');
-        ObjectLoader.component.require(self, url, function(loaded){
-          if (!(name in self.components)) {
-            throw new Error('component ' + name + ' is not found in ' + url.url );
-          }
-          callback(self.components[name]);
+      if (name.indexOf(':') >= 0) {
+        var parts = name.split(':');
+        var envName = parts[0];
+        name = parts[1];
+        getOrCreateEnv(envName, function(env){
+          env.getComponentClass(name, callback);
         });
+      } else {
+        if (name in self.components) {
+          callback(self.components[name], name, self);
+        } else {
+          var url = getUrl(self, self.Prefix.Component + name + '.js');
+          ObjectLoader.component.require(self, url, function(loaded){
+            if (!(name in self.components)) {
+              throw new Error('component ' + name + ' is not found in ' + url.url );
+            }
+            callback(self.components[name], name, self);
+          });
+        }
+
       }
     };
     return Env;
@@ -625,22 +631,10 @@
       forEachAsync(components, function(container, cb){
         var $container = $(container);
         var name = $container.data('name');
-        if (name.indexOf(':') >= 0) {
-          var parts = name.split(':');
-          envName = parts[0];
-          name = parts[1];
-          getOrCreateEnv(envName, function(env){
-            env.getComponentClass(name, function(componentClass){
-              var c = new componentClass(name, $container, env);
-              c.__load(cb, param);
-            });
-          });
-        } else {
-          self.F.getComponentClass(name, function(componentClass){
-            var c = new componentClass(name, $container, self.F);
-            c.__load(cb, param);
-          });
-        }
+        self.F.getComponentClass(name, function(componentClass, name, env){
+          var c = new componentClass(name, $container, env);
+          c.__load(cb, param);
+        });
       }, function(){
         self.publish(F.TOPIC.COMPONENT_LOADED_CHILDREN);
         if (callback) callback();
@@ -677,10 +671,21 @@
       if (!envName) return callback(F.defaultEnv);
       if (envName in envs) return callback(envs[envName]);
       if (!(envName in F.envDescs)) throw new Error('unknown env name: ' + envName);
-      ObjectLoader.config.require(envName, {type: 'js', url: F.envDescs[envName]}, function(env){
-        envs[envName] = env;
+
+      var onEnvLoaded = function(env) {
+        console.info('create env: ' + env.getName() + ' root: ' + env.SourceRoot);
+        envs[env.getName()] = env;
         callback(env);
-      });
+      };
+
+      var descUrl = F.envDescs[envName];
+      var ext = descUrl.split('.').pop();
+      if (ext !== 'js') {
+        if (descUrl[descUrl.length - 1] !== '/') descUrl += '/';
+        (new Env(envName, descUrl)).init(onEnvLoaded);
+      } else {
+        ObjectLoader.config.require(envName, { type: 'js', url: descUrl }, onEnvLoaded);
+      }
     };
   })();
 
