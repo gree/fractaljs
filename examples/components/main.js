@@ -1,1 +1,2 @@
-F("main", F.Component.extend({}));
+F('main', F.Component.extend({}));
+
