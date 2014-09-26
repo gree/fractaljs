@@ -165,79 +165,6 @@
     },
   };
 
-  var Pubsub = (function() {
-    var Stock = function(){
-      this.arrived = {};
-      this.buffer = {};
-    };
-    var count = function(){
-      var count = 0;
-      for (var i in this.buffer) ++count;
-      return count;
-    };
-    Stock.prototype.add = function(topic, data) {
-      if (count.bind(this)() >= 10 && !(topic in this.buffer)) {
-        var oldest = new Data();
-        var oldestTopic = "";
-        for (var i in this.arrived) {
-          if (this.arrived[i] < oldest) {
-            oldest = this.arrived[i];
-            oldestTopic = i;
-          }
-        }
-        delete this.buffer[oldestTopic];
-        delete this.arrived[oldestTopic];
-      }
-      this.buffer[topic] = data;
-      this.arrived[topic] = new Date();
-    };
-    Stock.prototype.get = function(topic) {
-      if (topic in this.buffer) {
-        var data = this.buffer[topic];
-        delete this.buffer[topic];
-        delete this.arrived[topic];
-        return data;
-      }
-      return null;
-    };
-
-    var topics = {};
-    var seq = 0;
-    var stock = new Stock();
-    return {
-      publish: function(topic, data) {
-        if (!topics[topic]) {
-          stock.add(topic, data);
-          return;
-        }
-        var subscribers = topics[topic];
-        for (var i in subscribers) subscribers[i].callback(topic, data);
-      },
-      subscribe: function(topic, callback) {
-        if (!topics[topic]) topics[topic] = [];
-        var token = ++seq;
-        topics[topic].push({
-          token: token,
-          callback: callback
-        });
-        var data = stock.get(topic);
-        if (data) callback(topic, data);
-        return token;
-      },
-      unsubscribe: function(topic, token) {
-        if (!(topic in topics)) return;
-        var subscribers = topics[topic];
-        for (var i in subscribers) {
-          if (subscribers[i].token === token) {
-            subscribers.splice(i, 1);
-            break;
-          }
-        }
-        if (subscribers.length === 0) delete topics[topic];
-      },
-    };
-  }());
-
   var Env = (function(){
     var getUrl = function(self, name) {
       var type = getType(name);
@@ -571,6 +498,79 @@
     };
   })();
 
+  var Pubsub = F.Pubsub = (function() {
+    var Stock = function(){
+      this.arrived = {};
+      this.buffer = {};
+    };
+    var count = function(){
+      var count = 0;
+      for (var i in this.buffer) ++count;
+      return count;
+    };
+    Stock.prototype.add = function(topic, data) {
+      if (count.bind(this)() >= 10 && !(topic in this.buffer)) {
+        var oldest = new Data();
+        var oldestTopic = "";
+        for (var i in this.arrived) {
+          if (this.arrived[i] < oldest) {
+            oldest = this.arrived[i];
+            oldestTopic = i;
+          }
+        }
+        delete this.buffer[oldestTopic];
+        delete this.arrived[oldestTopic];
+      }
+      this.buffer[topic] = data;
+      this.arrived[topic] = new Date();
+    };
+    Stock.prototype.get = function(topic) {
+      if (topic in this.buffer) {
+        var data = this.buffer[topic];
+        delete this.buffer[topic];
+        delete this.arrived[topic];
+        return data;
+      }
+      return null;
+    };
+
+    var topics = {};
+    var seq = 0;
+    var stock = new Stock();
+    return {
+      publish: function(topic, data, from) {
+        if (!topics[topic]) {
+          stock.add(topic, {d: data, f: from});
+          return;
+        }
+        var subscribers = topics[topic];
+        for (var i in subscribers) subscribers[i].callback(topic, data, from);
+      },
+      subscribe: function(topic, callback) {
+        if (!topics[topic]) topics[topic] = [];
+        var token = ++seq;
+        topics[topic].push({
+          token: token,
+          callback: callback
+        });
+        var data = stock.get(topic);
+        if (data) callback(topic, data.d, data.f);
+        return token;
+      },
+      unsubscribe: function(topic, token) {
+        if (!(topic in topics)) return;
+        var subscribers = topics[topic];
+        for (var i in subscribers) {
+          if (subscribers[i].token === token) {
+            subscribers.splice(i, 1);
+            break;
+          }
+        }
+        if (subscribers.length === 0) delete topics[topic];
+      },
+    };
+  }());
+
   F.Component = (function(){
     var ComponentFilter = '[data-role=component]';
 
@@ -605,24 +605,42 @@
       // // TODO implement if needed
       // self.children = [];
       // self.parent = null;
-      this.templateName = this.templateName || self.name;
+      this.templateName = this.templateName || this.name;
       if (typeof(this.template) === "string") this.template = this.F.Template.Compile(this.template);
 
       setLoad(this, this.getData);
       setLoad(this, this.getTemplate);
       setLoad(this, this.render);
       setLoad(this, this.afterRender);
-      setLoad(this, this.onMyselfLoaded);
+      setLoad(this, this.myselfLoaded);
       if (!this.loadMyselfOnly)
         setLoad(this, this.loadChildren);
-      setLoad(this, this.onAllLoaded);
+      setLoad(this, this.allLoaded);
 
+      var subscribes = [];
       for (var i in this) {
         if (typeof(this[i]) === 'function' && i.indexOf('on') === 0) {
-          this.subscribe(i.substr(2), this[i].bind(this));
+          subscribes.push([i.substr(2), this[i]]);
         }
       }
+      var publicMethods = this.Public || {};
+      for (var i in publicMethods) {
+        subscribes.push([this.F.getName() + '.' + this.name + '.' + i, publicMethods[i]]);
+      }
+
+      var self = this;
+      subscribes.forEach(function(v){
+        (function(topic, method){
+          self.subscribe(topic, function(topic, data, from){
+            method.bind(self)(data, from);
+          });
+        })(v[0], v[1]);
+      });
     };
+    Component.call = function(name, data) {
+      this.publish(this.F.getName() + '.' + name, data, this);
+    };
+
     Component.setTemplate = function(name) {
       this.templateName = name;
       this.template = null;
@@ -649,7 +667,7 @@
       callback();
     };
     Component.afterRender = null;
-    Component.onMyselfLoaded = function(callback){
+    Component.myselfLoaded = function(callback){
       this.rendered = true;
       while (this.earlyRecieved.length > 0) {
         this.earlyRecieved.pop()();
@@ -678,20 +696,20 @@
         if (callback) callback();
       })
     },
-    Component.onAllLoaded = null;
+    Component.allLoaded = null;
     Component.unload = function(){
       this.unsubscribe();
     };
 
     Component.require = function(name, options, callback) { this.F.require(name, options, callback); };
     Component.publish = function(topic, data) {
-      Pubsub.publish(topic, { from: this, data: data });
+      Pubsub.publish(topic, data, this);
     };
     Component.subscribe = function(topic, callback){
       var self = this;
-      self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data){
-        if (self.rendered) callback(topic, data.data, data.from);
-        else self.earlyRecieved.push(function(){ callback(topic, data.data, data.from); });
+      self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data, from){
+        if (self.rendered) callback(topic, data, from);
+        else self.earlyRecieved.push(function(){ callback(topic, data, from); });
       });
     };
     Component.unsubscribe = function(topic) {
