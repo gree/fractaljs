@@ -174,8 +174,7 @@
           if (type === 'ajax') throw new Error('relative path is not allow for ajax calls');
         }
         var base = (type === 'ajax') ? self.APIRoot : self.SourceRoot;
-        if (name.indexOf("/") === 0) name = name.slice(1);
-        return base + name;
+        return base + ((name.indexOf("/") === 0) ? name.slice(1) : name);
       })(type);
       return { id: name, type: type, url: url };
     };
@@ -625,7 +624,7 @@
       }
       var publicMethods = this.Public || {};
       for (var i in publicMethods) {
-        subscribes.push([this.F.getName() + '.' + this.name + '.' + i, publicMethods[i]]);
+        subscribes.push([this.F.getName() + ':' + this.name + '.' + i, publicMethods[i]]);
       }
 
       var self = this;
@@ -638,7 +637,11 @@
       });
     };
     Component.call = function(name, data) {
-      this.publish(this.F.getName() + '.' + name, data, this);
+      var topic = name;
+      if (name.indexOf(':') < 0) {
+        topic = this.F.getName() + ':' + topic;
+      }
+      this.publish(topic, data, this);
     };
 
     Component.setTemplate = function(name) {
