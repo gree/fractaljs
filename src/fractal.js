@@ -209,6 +209,12 @@
       for (var i in defaultConfig) {
         this[i] = config[i] || defaultConfig[i];
       }
+      var self = this;
+      ['Template', 'Prefix'].forEach(function(v){
+        for (var i in defaultConfig[v]) {
+          if (!self.Template[i]) self.Template[i] = defaultConfig[v][i];
+        }
+      });
     };
     var proto = Env.prototype;
     proto.getName = function() { return this.__name || '[default]'; };
