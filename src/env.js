@@ -1,4 +1,6 @@
 (function(namspace, global){
+  var EnvDescs = {};
+
   var getType = (function(){
     var KNOWN_TYPES = {js:1, css:1, tmpl:1};
     return function(name) {
@@ -55,10 +57,11 @@
     };
     var proto = Env.prototype;
     proto.getDisplayName = function() { return this.__name || '[default]'; };
+    proto.getName = function() { return this.__name; };
     proto.init = function(callback) {
       var self = this;
       for (var i in self.Envs) {
-        F.envDescs[i] = self.Envs[i];
+        EnvDescs[i] = self.Envs[i];
       }
       self.require([self.DomParser, self.Template.Engine], function(){
         $.event.special.destroyed = {
@@ -151,14 +154,16 @@
         }
       }
     };
+
     return Env;
   })();
 
   namespace.getOrCreateEnv = (function(){
     var envs = {};
     return function(envName, callback) {
+      if (!envName) return callback(namespace.defaultEnv);
       if (envName in envs) return callback(envs[envName]);
-      if (!(envName in F.envDescs)) throw new Error('unknown env name: ' + envName);
+      if (!(envName in EnvDescs)) throw new Error('unknown env name: ' + envName);
 
       var onEnvLoaded = function(env) {
         console.info('create env: ' + env.getDisplayName() + ' root: ' + env.SourceRoot);
@@ -166,7 +171,7 @@
         callback(env);
       };
 
-      var descUrl = F.envDescs[envName];
+      var descUrl = EnvDescs[envName];
       var ext = descUrl.split('.').pop();
       if (ext !== 'js') {
         if (descUrl[descUrl.length - 1] !== '/') descUrl += '/';
@@ -181,3 +186,4 @@
     };
   })();
 })(window.F._private, window);
+
