@@ -17,12 +17,15 @@
     var lockedCall = function(func) {
       if (!lock.get()) {
         queue.push(func);
+        return false;
       } else {
-        func();
-        lock.release();
-        if (queue.length) {
-          lockedCall(queue.shift());
-        }
+        func(function(){
+          lock.release();
+          if (queue.length) {
+            lockedCall(queue.shift());
+          }
+        });
+        return true;
       }
     };
 
@@ -32,10 +35,15 @@
           data.components[name] = component;
         },
         load: function(url, callback) {
-          lockedCall(function(){
+          var res = lockedCall(function(lockedCallback){
             data.components = {};
-            namespace.require(url, function(){ callback(data.components); });
+            namespace.require(url, function(){
+              var components = data.components;
+              lockedCallback();
+              callback(components);
+            });
           });
+          console.debug("lockedCall", url, res);
         },
       },
       config: {
@@ -43,8 +51,12 @@
           data.config = config;
         },
         load: function(url, callback) {
-          lockedCall(function(){
-            namespace.require(url, function(){ callback(data.config); });
+          lockedCall(function(lockedCallback){
+            namespace.require(url, function(){
+              var config = data.config;
+              lockedCallback();
+              callback(config);
+            });
           });
         },
       },
@@ -69,15 +81,13 @@
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
       xhr.onreadystatechange = function () {
-        if (xhr.readyState == 4) {
+        if (xhr.readyState === 4) {
           var err, data;
-          if ((xhr.status == 200 || xhr.status == 0) && xhr.responseText) {
-            err = false;
-            data = xhr.resposneText;
+          if ((xhr.status === 200 || xhr.status === 0) && xhr.responseText) {
+            callback(false, xhr.responseText);
           } else {
-            err = 'unexpected server resposne: ' + xhr.status;
+            callback("unexpected server resposne: " + xhr.status);
           }
-          callback(err, data);
         }
       }
       xhr.send("");
@@ -119,7 +129,7 @@
         var timeout = setTimeout(function(){
           console.error('Require timeout: ' + resource.url);
           releaseListeners(resource);
-        });
+        }, 10000);
         listeners[resource.url] = [callback];
         Type2Getter[resource.type](resource.url, function(err, data) {
           clearTimeout(timeout);

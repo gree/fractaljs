@@ -1,4 +1,4 @@
-(function(namspace){
+(function(namespace){
   var Class = (function(){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
@@ -165,7 +165,7 @@
         var name = $container.data('name');
         self.F.getComponentClass(name, function(componentClass, name, env){
           var c = new componentClass(name, $container, env);
-          c.__load(cb, param);
+          c.load(param, cb);
         });
       }, function(){
         self.publish(namespace.TOPIC.COMPONENT_LOADED_CHILDREN);
@@ -173,10 +173,7 @@
       })
     },
     Component.allLoaded = null;
-
-    Component.unload = function(){
-      this.unsubscribe();
-    };
+    Component.unload = function(){ this.unsubscribe(); };
 
     Component.require = function(name, options, callback) { this.F.require(name, options, callback); };
     Component.publish = function(topic, data) { namespace.Pubsub.publish(topic, data, this); };

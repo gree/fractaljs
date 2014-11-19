@@ -1,4 +1,8 @@
 (function(global){
+  var ready = false;
+  var readyListeners = [];
+  var namespace = {};
+
   var F = global.Fractal = global.F = function(arg1, arg2){
     var callback = null;
 
@@ -9,13 +13,13 @@
       // define a component
       var name = arg1, component = arg2;
       callback = function(){
-        ObjectLoader.component.define(name, component);
+        namespace.ObjectLoader.component.define(name, component);
       };
     } else if (typeof(arg1) === 'object') {
       // env config
       var config = arg1;
       callback = function(){
-        ObjectLoader.config.define(config);
+        namespace.ObjectLoader.config.define(config);
       }
     }
 
@@ -24,30 +28,23 @@
     readyListeners.push(callback);
   };
 
-  var namespace = F._private = {};
-
+  F._private = namespace;
   F.construct = function(config, callback){
     if (typeof(config) === "function") {
       callback = config;
       config = {};
     }
-    (function(config, cb){
-      if (!namespace.defaultEnv) {
-        var env = new Env("", "", config);
-        env.init(function(){
-          namespace.defaultEnv = env;
-          cb(env);
-        });
-      } else {
-        cb(namespace.defaultEnv);
-      }
-    })(config, function(env){
+    namespace.createDefaultEnv(config, function(env){
       if (readyListeners && readyListeners.length) {
         readyListeners.forEach(function(v){ v(); });
         readyListeners = [];
       }
-      ready =  true;
 
+      //setup public interface
+      F.Component = F._private.Component;
+      F.TOPIC = F._private.TOPIC;
+
+      ready =  true;
       var c = new F.Component("__ROOT__", $(global.document), env);
       c.loadChildren(callback);
     });
