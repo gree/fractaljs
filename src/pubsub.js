@@ -5,12 +5,13 @@
     this.arrived = {};
     this.buffer = {};
   };
-  Stock.prototype.count = function(){
+  var proto = Stock.prototype;
+  proto.count = function(){
     var count = 0;
     for (var i in this.buffer) ++count;
     return count;
   };
-  Stock.prototype.add = function(topic, data) {
+  proto.add = function(topic, data) {
     if (this.count() >= MaxStocked && !(topic in this.buffer)) {
       var oldest = new Data();
       var oldestTopic = "";
@@ -26,7 +27,7 @@
     this.buffer[topic] = data;
     this.arrived[topic] = new Date();
   };
-  Stock.prototype.get = function(topic) {
+  proto.get = function(topic) {
     if (topic in this.buffer) {
       var data = this.buffer[topic];
       delete this.buffer[topic];
@@ -48,7 +49,7 @@
           return;
         }
         var subscribers = topics[topic];
-        for (var i in subscribers) subscribers[i].callback(topic, data, from);
+        for (var i in subscribers) subscribers[i].cb(topic, data, from);
       },
       subscribe: function(topic, callback) {
         console.debug("Pubsub: subscribe", topic);
@@ -56,7 +57,7 @@
         var token = ++seq;
         topics[topic].push({
           token: token,
-          callback: callback
+          cb: callback
         });
         var data = stock.get(topic);
         if (data) {
@@ -79,5 +80,5 @@
       },
     };
   }());
-})(window.F._private);
+})(window.F.__);
 

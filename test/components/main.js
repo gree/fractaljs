@@ -5,11 +5,11 @@ F('main', F.Component.extend({
 
     self.subscribe(F.TOPIC.COMPONENT_LOADED_MYSELF, function(topic, data, from){
       // let it go
-      // console.log(topic, from.name);
+      console.log(topic, from.name);
     });
     self.subscribe(F.TOPIC.COMPONENT_LOADED_CHILDREN, function(topic, data, from){
       // let it go
-      // console.log(topic, from.name);
+      console.log(topic, from.name);
     });
   }
 }));

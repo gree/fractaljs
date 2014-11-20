@@ -31,7 +31,7 @@
         prop[name];
       }
 
-      function Class() {
+      var Class = function(){
         if ( !initializing && this.init )
           this.init.apply(this, arguments);
       }
@@ -40,7 +40,7 @@
       Class.prototype.constructor = Class;
 
       Class.extend = arguments.callee;
-
+      Class.isComponent = true;
       return Class;
     };
 
@@ -49,7 +49,6 @@
 
   namespace.Component = (function(){
     var ComponentFilter = "[data-role=component]";
-
     var setLoad = function(self, next) {
       if (!next) return;
       if (!self.__load){
@@ -194,5 +193,5 @@
 
     return Class.extend(Component);
   })();
-})(window.F._private);
+})(window.F.__);
 

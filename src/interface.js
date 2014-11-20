@@ -28,31 +28,26 @@
     readyListeners.push(callback);
   };
 
-  F._private = namespace;
+  F.__ = namespace;
   F.construct = function(config, callback){
     if (typeof(config) === "function") {
       callback = config;
       config = {};
     }
     namespace.createDefaultEnv(config, function(env){
+      console.debug("defaultEnv", env);
       if (readyListeners && readyListeners.length) {
         readyListeners.forEach(function(v){ v(); });
         readyListeners = [];
       }
-
-      //setup public interface
-      F.Component = F._private.Component;
-      F.TOPIC = F._private.TOPIC;
-
-      ready =  true;
+      F.Component = F.__.Component;
+      ready = true;
       var c = new F.Component("__ROOT__", $(global.document), env);
       c.loadChildren(callback);
     });
   };
-})(window);
 
-(function(namespace){
-  namespace.TOPIC = {
+  F.TOPIC = {
     COMPONENT_LOADED_MYSELF: "component.loaded.myself",
     COMPONENT_LOADED_CHILDREN: "component.loaded.children",
   };
@@ -67,5 +62,5 @@
       });
     }
   };
-})(window.F._private);
+})(window);
 

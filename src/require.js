@@ -31,8 +31,8 @@
 
     return {
       component: {
-        define: function(name, component) {
-          data.components[name] = component;
+        define: function(name, constructor) {
+          data.components[name] = constructor;
         },
         load: function(url, callback) {
           var res = lockedCall(function(lockedCallback){
@@ -80,7 +80,7 @@
     var byAjax = function(url, callback){
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
-      xhr.onreadystatechange = function () {
+      xhr.onreadystatechange = function(){
         if (xhr.readyState === 4) {
           var err, data;
           if ((xhr.status === 200 || xhr.status === 0) && xhr.responseText) {
@@ -112,7 +112,9 @@
       var cache = {};
 
       var releaseListeners = function(resource, data) {
-        listeners[resource.url].forEach(function(v){v(data, resource.id);});
+        listeners[resource.url].forEach(function(v){
+          v(data, resource.id);
+        });
         delete listeners[resource.url];
       };
 
@@ -148,13 +150,19 @@
         return singleRequire(resourceList, callback);
       }
       var retData = {};
-      namespace.forEachAsync(resourceList, function(v, cb){
-        singleRequire(v, function(data, id){
-          retData[id] = data;
-          cb();
-        });
-      }, function(){ callback(retData); });
+      namespace.forEachAsync(
+        resourceList,
+        function(v, cb){
+          singleRequire(v, function(data, id){
+            retData[id] = data;
+            cb();
+          });
+        },
+        function(){
+          callback(retData);
+        }
+      );
     };
   })();
-})(window.F._private);
+})(window.F.__);
 
