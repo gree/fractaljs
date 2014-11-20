@@ -17,25 +17,33 @@
     var lockedCall = function(func) {
       if (!lock.get()) {
         queue.push(func);
+        return false;
       } else {
-        func();
-        lock.release();
-        if (queue.length) {
-          lockedCall(queue.shift());
-        }
+        func(function(){
+          lock.release();
+          if (queue.length) {
+            lockedCall(queue.shift());
+          }
+        });
+        return true;
       }
     };
 
     return {
       component: {
-        define: function(name, component) {
-          data.components[name] = component;
+        define: function(name, constructor) {
+          data.components[name] = constructor;
         },
         load: function(url, callback) {
-          lockedCall(function(){
+          var res = lockedCall(function(lockedCallback){
             data.components = {};
-            namespace.require(url, function(){ callback(data.components); });
+            namespace.require(url, function(){
+              var components = data.components;
+              lockedCallback();
+              callback(components);
+            });
           });
+          console.debug("lockedCall", url, res);
         },
       },
       config: {
@@ -43,8 +51,12 @@
           data.config = config;
         },
         load: function(url, callback) {
-          lockedCall(function(){
-            namespace.require(url, function(){ callback(data.config); });
+          lockedCall(function(lockedCallback){
+            namespace.require(url, function(){
+              var config = data.config;
+              lockedCallback();
+              callback(config);
+            });
           });
         },
       },
@@ -68,16 +80,14 @@
     var byAjax = function(url, callback){
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState == 4) {
+      xhr.onreadystatechange = function(){
+        if (xhr.readyState === 4) {
           var err, data;
-          if ((xhr.status == 200 || xhr.status == 0) && xhr.responseText) {
-            err = false;
-            data = xhr.resposneText;
+          if ((xhr.status === 200 || xhr.status === 0) && xhr.responseText) {
+            callback(false, xhr.responseText);
           } else {
-            err = 'unexpected server resposne: ' + xhr.status;
+            callback("unexpected server resposne: " + xhr.status);
           }
-          callback(err, data);
         }
       }
       xhr.send("");
@@ -102,7 +112,9 @@
       var cache = {};
 
       var releaseListeners = function(resource, data) {
-        listeners[resource.url].forEach(function(v){v(data, resource.id);});
+        listeners[resource.url].forEach(function(v){
+          v(data, resource.id);
+        });
         delete listeners[resource.url];
       };
 
@@ -119,7 +131,7 @@
         var timeout = setTimeout(function(){
           console.error('Require timeout: ' + resource.url);
           releaseListeners(resource);
-        });
+        }, 10000);
         listeners[resource.url] = [callback];
         Type2Getter[resource.type](resource.url, function(err, data) {
           clearTimeout(timeout);
@@ -138,13 +150,19 @@
         return singleRequire(resourceList, callback);
       }
       var retData = {};
-      namespace.forEachAsync(resourceList, function(v, cb){
-        singleRequire(v, function(data, id){
-          retData[id] = data;
-          cb();
-        });
-      }, function(){ callback(retData); });
+      namespace.forEachAsync(
+        resourceList,
+        function(v, cb){
+          singleRequire(v, function(data, id){
+            retData[id] = data;
+            cb();
+          });
+        },
+        function(){
+          callback(retData);
+        }
+      );
     };
   })();
-})(window.F._private);
+})(window.F.__);
 

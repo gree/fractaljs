@@ -1,4 +1,4 @@
-(function(namspace, global){
+(function(namespace, global){
   var EnvDescs = {};
 
   var getType = (function(){
@@ -56,7 +56,7 @@
       });
     };
     var proto = Env.prototype;
-    proto.getDisplayName = function() { return this.__name || '[default]'; };
+    proto.getDisplayName = function() { return this.__name || '[defaultEnv]'; };
     proto.getName = function() { return this.__name; };
     proto.init = function(callback) {
       var self = this;
@@ -116,41 +116,44 @@
         var envName = parts[0];
         var componentName = parts[1];
         getOrCreateEnv(envName, function(env){
+          console.debug("env: getComponentClass from other env", envName, componentName);
           env.getComponentClass(componentName, callback);
         });
       } else {
         if (name in self.components) {
+          console.debug("env: getComponentClass return from cache", self.getDisplayName(), name);
           callback(self.components[name], name, self);
         } else {
           var url = resolveUrl(self, self.Prefix.Component + name + '.js');
-          ObjectLoader.component.load(url, function(components){
+          namespace.ObjectLoader.component.load(url, function(components){
             var asyncCalls = [];
-            for (var name in components) {
-              var componentClass = components[i];
-              if (componentClass.prototype && componentClass.prototype.constructor.name === 'Class') {
-                console.info('load ' + name + ' into ' + self.getDisplayName());
-                self.components[name] = componentClass;
+            for (var i in components) {
+              var constructor = components[i];
+              if (constructor.isComponent) {
+                console.log('env: load ' + name + ' into ' + self.getDisplayName());
+                self.components[i] = constructor;
               } else {
                 // this componentClass will be generated from a function
-                asyncCalls.push([name, componentClass]);
+                asyncCalls.push({name: i, createClass: constructor});
               }
             }
-            forEachAsync(asyncCalls, function(v, cb){
-              var name = v[0];
-              var createClass = v[1];
-              createClass(self, function(componentClass){
-                console.info('load ' + name + ' into ' + self.getDisplayName());
-                self.components[name] = componentClass;
-                cb();
-              });
-            }, function(){
-              if (!(name in components)) {
-                throw new Error('component ' + name + ' is not found in ' + url.url);
+            namespace.forEachAsync(
+              asyncCalls,
+              function(v, cb){
+                v.createClass(self, function(componentClass){
+                  console.log('env: load ' + v.name + ' into ' + self.getDisplayName());
+                  self.components[v.name] = componentClass;
+                  cb();
+                });
+              },
+              function(){
+                if (!(name in components)) {
+                  throw new Error('component ' + name + ' is not found in ' + url.url);
+                }
+                callback(self.components[name], name, self);
               }
-              callback(self.components[name], name, self);
-            });
-
-          });
+            );
+          }); // ObjectLoader.component.load
         }
       }
     };
@@ -158,7 +161,7 @@
     return Env;
   })();
 
-  namespace.getOrCreateEnv = (function(){
+  var getOrCreateEnv = (function(){
     var envs = {};
     return function(envName, callback) {
       if (!envName) return callback(namespace.defaultEnv);
@@ -166,7 +169,7 @@
       if (!(envName in EnvDescs)) throw new Error('unknown env name: ' + envName);
 
       var onEnvLoaded = function(env) {
-        console.info('create env: ' + env.getDisplayName() + ' root: ' + env.SourceRoot);
+        console.log('env: create', env.getDisplayName(), 'root:', env.SourceRoot);
         envs[envName] = env;
         callback(env);
       };
@@ -185,5 +188,15 @@
       }
     };
   })();
-})(window.F._private, window);
+
+  namespace.createDefaultEnv = function(config, cb){
+    if (namespace.defaultEnv) return cb(namespace.defaultEnv);
+    var env = new Env("", "", config);
+    env.init(function(){
+      namespace.defaultEnv = env;
+      cb(env);
+    });
+  };
+
+})(window.F.__, window);
 

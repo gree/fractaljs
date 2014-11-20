@@ -1,4 +1,4 @@
-(function(namspace){
+(function(namespace){
   var Class = (function(){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
@@ -31,7 +31,7 @@
         prop[name];
       }
 
-      function Class() {
+      var Class = function(){
         if ( !initializing && this.init )
           this.init.apply(this, arguments);
       }
@@ -40,7 +40,7 @@
       Class.prototype.constructor = Class;
 
       Class.extend = arguments.callee;
-
+      Class.isComponent = true;
       return Class;
     };
 
@@ -49,7 +49,6 @@
 
   namespace.Component = (function(){
     var ComponentFilter = "[data-role=component]";
-
     var setLoad = function(self, next) {
       if (!next) return;
       if (!self.__load){
@@ -165,7 +164,7 @@
         var name = $container.data('name');
         self.F.getComponentClass(name, function(componentClass, name, env){
           var c = new componentClass(name, $container, env);
-          c.__load(cb, param);
+          c.load(param, cb);
         });
       }, function(){
         self.publish(namespace.TOPIC.COMPONENT_LOADED_CHILDREN);
@@ -173,10 +172,7 @@
       })
     },
     Component.allLoaded = null;
-
-    Component.unload = function(){
-      this.unsubscribe();
-    };
+    Component.unload = function(){ this.unsubscribe(); };
 
     Component.require = function(name, options, callback) { this.F.require(name, options, callback); };
     Component.publish = function(topic, data) { namespace.Pubsub.publish(topic, data, this); };
@@ -197,5 +193,5 @@
 
     return Class.extend(Component);
   })();
-})(window.F._private);
+})(window.F.__);
 
