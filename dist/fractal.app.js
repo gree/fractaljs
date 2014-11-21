@@ -1,3 +1,4 @@
+// Source: src/app.js
 F(function(){
   var namespace = {};
   var PageKey = "page";
@@ -85,7 +86,6 @@ F(function(){
       self._super(name, $container, env);
       self.componentName = self.getDefaultName();
       self.subscribe("app.query.changed", function(topic, data){
-        console.debug(self.name, topic, data);
         self.getComponentName(data, function(componentName){
           if (componentName && self.componentName !== componentName) {
             self.componentName = componentName;

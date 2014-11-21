@@ -16,7 +16,7 @@ module.exports = function (grunt) {
       options: {
         process: function(src, filepath) {
           return '// Source: ' + filepath + '\n' +
-            src.replace(/(^|\n)[ \t]*(console.debug|console.log)\([^\n]+(\n)/g, '$1');
+            src.replace(/(^|\n)[ \t]*(console.time|console.debug|console.log)\([^\n]+(\n)/g, '$1');
         },
       },
       dist: {
@@ -28,7 +28,13 @@ module.exports = function (grunt) {
           'src/component.js'
         ],
         dest: 'dist/fractal.js'
-      }
+      },
+      app: {
+        src: [
+          'src/app.js'
+        ],
+        dest: 'dist/fractal.app.js',
+      },
     },
 
     uglify: {

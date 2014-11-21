@@ -44,7 +44,7 @@
     return {
       publish: function(topic, data, from) {
         if (!topics[topic]) {
-          console.debug("Pubsub: stock message", topic, from.name, data);
+          console.debug("stock message", topic, from.name, data);
           stock.add(topic, {d: data, f: from});
           return;
         }
@@ -52,7 +52,7 @@
         for (var i in subscribers) subscribers[i].cb(topic, data, from);
       },
       subscribe: function(topic, callback) {
-        console.debug("Pubsub: subscribe", topic);
+        console.debug("subscribe", topic);
         if (!topics[topic]) topics[topic] = [];
         var token = ++seq;
         topics[topic].push({
@@ -61,13 +61,13 @@
         });
         var data = stock.get(topic);
         if (data) {
-          console.debug("Pubsub: get from stock", topic, data.f, data.d);
+          console.debug("get from stock", topic, data.f, data.d);
           callback(topic, data.d, data.f);
         }
         return token;
       },
       unsubscribe: function(topic, token) {
-        console.debug("Pubsub: unsubscribe", topic);
+        console.debug("unsubscribe", topic);
         if (!(topic in topics)) return;
         var subscribers = topics[topic];
         for (var i in subscribers) {

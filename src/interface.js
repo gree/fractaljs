@@ -30,26 +30,27 @@
 
   F.__ = namespace;
   F.construct = function(config, callback){
+    console.time("F.construct");
     if (typeof(config) === "function") {
       callback = config;
       config = {};
     }
     namespace.createDefaultEnv(config, function(env){
       console.debug("defaultEnv", env);
+
+      F.Component = F.__.Component;
+
       if (readyListeners && readyListeners.length) {
         readyListeners.forEach(function(v){ v(); });
         readyListeners = [];
       }
-      F.Component = F.__.Component;
       ready = true;
       var c = new F.Component("__ROOT__", $(global.document), env);
-      c.loadChildren(callback);
+      c.loadChildren(function(){
+        console.timeEnd("F.construct");
+        if (callback) callback();
+      });
     });
-  };
-
-  F.TOPIC = {
-    COMPONENT_LOADED_MYSELF: "component.loaded.myself",
-    COMPONENT_LOADED_CHILDREN: "component.loaded.children",
   };
 
   namespace.forEachAsync = function(items, onEach, onDone) {

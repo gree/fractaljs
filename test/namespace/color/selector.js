@@ -3,7 +3,7 @@ F('selector', F.Component.extend({
     var self = this;
     self.$('select').change(function(){
       var name = self.F.getName() + ":" + this.value;
-      self.call(':display.change', name);
+      self.call('namespace:display.change', name);
     });
     cb();
   }

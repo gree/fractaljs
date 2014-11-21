@@ -11,12 +11,16 @@
     <script type="text/javascript" src="../src/pubsub.js"></script>
     <script type="text/javascript" src="../src/env.js"></script>
     <script type="text/javascript" src="../src/component.js"></script>
+    <script type="text/javascript" src="../src/app.js"></script>
     <script type="text/javascript">
       var config = {
+        Prefix: {
+          Component: "main/",
+          Template: "main/",
+        },
         Envs: {
-          font: 'font/',
-          color: 'color/index.js'
-        }
+          namespace: "namespace/config.js",
+        },
       };
       F.construct(config);
     </script>

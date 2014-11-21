@@ -1,49 +1,65 @@
 (function(namespace){
+  var getResourceType = (function(){
+    var KNOWN_TYPES = {js:1, css:1, tmpl:1};
+    return function(name) {
+      var type = name.split(".").pop();
+      return (type in KNOWN_TYPES) ? type : "tmpl";
+    };
+  })();
+
   namespace.ObjectLoader = (function(){
-    var data = null;
-    var queue = [];
+    // var data = null;
+    // var queue = [];
 
-    var lock = {
-      get: function(){
-        if (!data) {
-          data = {};
-          return true;
-        }
-        return false;
-      },
-      release: function(){ data = null; }
-    };
+    // var lock = {
+    //   get: function(){
+    //     if (!data) {
+    //       data = {};
+    //       return true;
+    //     }
+    //     return false;
+    //   },
+    //   release: function(){
+    //     data = null;
+    //   },
+    // };
 
-    var lockedCall = function(func) {
-      if (!lock.get()) {
-        queue.push(func);
-        return false;
-      } else {
-        func(function(){
-          lock.release();
-          if (queue.length) {
-            lockedCall(queue.shift());
-          }
-        });
-        return true;
-      }
-    };
+    // var lockedCall = function(func) {
+    //   if (!lock.get()) {
+    //     queue.push(func);
+    //     return false;
+    //   } else {
+    //     func(function(){
+    //       lock.release();
+    //       if (queue.length) {
+    //         lockedCall(queue.shift());
+    //       }
+    //     });
+    //     return true;
+    //   }
+    // };
 
+    data = {}; // TODO remove me
     return {
       component: {
         define: function(name, constructor) {
           data.components[name] = constructor;
         },
         load: function(url, callback) {
-          var res = lockedCall(function(lockedCallback){
-            data.components = {};
-            namespace.require(url, function(){
-              var components = data.components;
-              lockedCallback();
-              callback(components);
-            });
+          // var res = lockedCall(function(lockedCallback){
+          //   data.components = {};
+          //   namespace.require(url, function(){
+          //     var components = data.components;
+          //     lockedCallback();
+          //     callback(components);
+          //   });
+          // });
+          // console.debug("lockedCall", url, res);
+          data.components = {};
+          namespace.require(url, function(){
+            var components = data.components;
+            callback(components);
           });
-          console.debug("lockedCall", url, res);
         },
       },
       config: {
@@ -51,12 +67,16 @@
           data.config = config;
         },
         load: function(url, callback) {
-          lockedCall(function(lockedCallback){
-            namespace.require(url, function(){
-              var config = data.config;
-              lockedCallback();
-              callback(config);
-            });
+          // lockedCall(function(lockedCallback){
+          //   namespace.require(url, function(){
+          //     var config = data.config;
+          //     lockedCallback();
+          //     callback(config);
+          //   });
+          // });
+          namespace.require(url, function(){
+            var config = data.config;
+            callback(config);
           });
         },
       },
@@ -111,47 +131,49 @@
       var listeners = {};
       var cache = {};
 
-      var releaseListeners = function(resource, data) {
-        listeners[resource.url].forEach(function(v){
-          v(data, resource.id);
+      var releaseListeners = function(url, data) {
+        listeners[url].forEach(function(v){
+          v(data);
         });
-        delete listeners[resource.url];
+        delete listeners[url];
       };
 
-      return function(resource, callback) {
-        if (resource.url in cache) {
-          callback(cache[resource.url], resource.id);
+      return function(url, callback) {
+        if (url in cache) {
+          callback(cache[url]);
           return;
         }
-        if (resource.url in listeners) {
-          listeners[resource.url].push(callback);
+        if (url in listeners) {
+          listeners[url].push(callback);
           return;
         }
 
         var timeout = setTimeout(function(){
-          console.error('Require timeout: ' + resource.url);
-          releaseListeners(resource);
+          console.error('Require timeout: ' + url);
+          releaseListeners(url);
         }, 10000);
-        listeners[resource.url] = [callback];
-        Type2Getter[resource.type](resource.url, function(err, data) {
+        listeners[url] = [callback];
+        var type = getResourceType(url);
+        Type2Getter[type](url, function(err, data) {
           clearTimeout(timeout);
           if (err) {
             console.error('Require error: ' + err);
           } else {
-            cache[resource.url] = data;
+            cache[url] = data;
           }
-          releaseListeners(resource, data);
+          releaseListeners(url, data);
         });
       };
     })();
 
-    return function(resourceList, callback) {
-      if (!Array.isArray(resourceList)) {
-        return singleRequire(resourceList, callback);
+    return function(urlList, callback) {
+      if (!Array.isArray(urlList)) {
+        return singleRequire(urlList, callback);
       }
+      if (!urlList.length) return callback();
       var retData = {};
       namespace.forEachAsync(
-        resourceList,
+        urlList,
         function(v, cb){
           singleRequire(v, function(data, id){
             retData[id] = data;
