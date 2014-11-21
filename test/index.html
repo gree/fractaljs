@@ -7,12 +7,18 @@
     <div data-role="component" data-name="main"></div>
 
     <script type="text/javascript" src="../dist/fractal.min.js"></script>
+    <script type="text/javascript" src="../dist/fractal.app.js"></script>
     <script type="text/javascript">
       var config = {
+        Prefix: {
+          Component: "main/",
+          Template: "main/",
+        },
         Envs: {
-          font: 'font/',
-          color: 'color/index.js'
-        }
+          namespace: "namespace/config.js",
+          recursive: "recursive/",
+          list: "list/",
+        },
       };
       F.construct(config);
     </script>
