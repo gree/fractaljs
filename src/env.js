@@ -111,13 +111,15 @@
           callback(self.components[name], name, self);
         } else {
           var url = self.resolveUrl(self.Prefix.Component + name + ".js");
-          namespace.ObjectLoader.component.load(url, function(components){
+          namespace.requireComponents(self.getName(), url, function(components){
             var asyncCalls = [];
             for (var i in components) {
               var constructor = components[i];
               if (constructor.isComponent) {
-                console.log("load " + self.getName() + ":" + i + " from " + url);
-                self.components[i] = constructor;
+                if (!(i in self.components)) {
+                  console.log("load " + self.getName() + ":" + i + " from " + url);
+                  self.components[i] = constructor;
+                }
               } else {
                 // this componentClass will be generated from a function
                 asyncCalls.push({name: i, createClass: constructor});
@@ -139,7 +141,7 @@
                 callback(self.components[name], name, self);
               }
             );
-          }); // ObjectLoader.component.load
+          }); // requireComponents
         }
       }
     };
@@ -167,7 +169,7 @@
         var env = new Env(envName, descUrl);
           env.init(onEnvLoaded);
       } else {
-        namespace.ObjectLoader.config.load(descUrl, function(config){
+        namespace.requireConfig(descUrl, function(config){
           var env = new Env(envName, descUrl, config);
           env.init(onEnvLoaded);
         });

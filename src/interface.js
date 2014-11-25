@@ -13,13 +13,13 @@
       // define a component
       var name = arg1, component = arg2;
       callback = function(){
-        namespace.ObjectLoader.component.define(name, component);
+        namespace.define(name, component);
       };
     } else if (typeof(arg1) === 'object') {
       // env config
       var config = arg1;
       callback = function(){
-        namespace.ObjectLoader.config.define(config);
+        namespace.define("", config);
       }
     }
 

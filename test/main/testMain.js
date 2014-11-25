@@ -5,6 +5,7 @@ F("testMain", F.Component.extend({
         "list",
         "recursive",
         "namespace",
+        "require",
       ]
     });
   },

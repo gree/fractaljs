@@ -7,6 +7,77 @@
     };
   })();
 
+  (function(){
+    var data = null;
+    var dataOwner = null;
+    var ownerCount = 0;
+    var queue = [];
+
+    var release = function(name){
+      if (name !== dataOwner) return false;
+      --ownerCount;
+      console.debug("release", dataOwner, ownerCount);
+      if (ownerCount === 0) {
+        console.debug("release done", dataOwner);
+        data = null;
+        dataOwner = null;
+        ownerCount = 0;
+      }
+      return true;
+    };
+
+    var lock = function(name) {
+      if (!dataOwner){
+      //if (!dataOwner || dataOwner === name) {
+        dataOwner = name;
+        ++ownerCount;
+        data = {};
+        console.debug("lock", dataOwner, ownerCount);
+        return true;
+      } else {
+        return false;
+      }
+    };
+
+    var loadObjects = function(name, url, callback) {
+      console.debug("loadObjects", name, url);
+      if (lock(name)) {
+        namespace.require(url, function(){
+          var loadedData = data;
+          release(name);
+          if (queue.length) queue.shift()();
+          callback(loadedData);
+        });
+      } else {
+        queue.push(function(){
+          loadObjects(name, url, callback);
+        });
+      }
+    };
+
+    namespace.define = function(name, constructor) {
+      console.debug("define", name, "dataOwner", dataOwner);
+      data[name] = constructor;
+    };
+
+    namespace.requireComponents = function(envName, url, callback) {
+      loadObjects("component." + envName, url, callback);
+    };
+
+    namespace.requireConfig = function(url, callback) {
+      loadObjects("config", url, function(data){
+        if (data) {
+          for (var i in data) {
+            callback(data[i]);
+            break;
+          }
+        } else {
+          callback();
+        }
+      });
+    };
+  })();
+
   namespace.ObjectLoader = (function(){
     // var data = null;
     // var queue = [];
@@ -55,9 +126,11 @@
           //   });
           // });
           // console.debug("lockedCall", url, res);
+          console.log("load", url);
           data.components = {};
           namespace.require(url, function(){
             var components = data.components;
+            console.log("load done", url);
             callback(components);
           });
         },
