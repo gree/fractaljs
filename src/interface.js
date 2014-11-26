@@ -23,8 +23,12 @@
       }
     }
 
-    if (!callback) return;
-    if (ready) return callback();
+    if (!callback) {
+      return;
+    }
+    if (ready) {
+      return callback();
+    }
     readyListeners.push(callback);
   };
 
@@ -41,27 +45,21 @@
       F.Component = F.__.Component;
 
       if (readyListeners && readyListeners.length) {
-        readyListeners.forEach(function(v){ v(); });
+        readyListeners.forEach(function(v){
+          v();
+        });
         readyListeners = [];
       }
       ready = true;
       var c = new F.Component("__ROOT__", $(global.document), env);
       c.loadChildren(function(){
         console.timeEnd("F.construct");
-        if (callback) callback();
+        if (callback) {
+          callback();
+        }
       });
     });
   };
 
-  namespace.forEachAsync = function(items, onEach, onDone) {
-    var len = items.length;
-    if (!len) return onDone();
-    var i = 0, complete = 0;
-    for (; i<len; ++i) {
-      onEach(items[i], function(){
-        if (++complete === len) onDone();
-      });
-    }
-  };
 })(window);
 

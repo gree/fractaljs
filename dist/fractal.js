@@ -14,18 +14,22 @@
       // define a component
       var name = arg1, component = arg2;
       callback = function(){
-        namespace.ObjectLoader.component.define(name, component);
+        namespace.define(name, component);
       };
     } else if (typeof(arg1) === 'object') {
       // env config
       var config = arg1;
       callback = function(){
-        namespace.ObjectLoader.config.define(config);
+        namespace.define("", config);
       }
     }
 
-    if (!callback) return;
-    if (ready) return callback();
+    if (!callback) {
+      return;
+    }
+    if (ready) {
+      return callback();
+    }
     readyListeners.push(callback);
   };
 
@@ -40,29 +44,83 @@
       F.Component = F.__.Component;
 
       if (readyListeners && readyListeners.length) {
-        readyListeners.forEach(function(v){ v(); });
+        readyListeners.forEach(function(v){
+          v();
+        });
         readyListeners = [];
       }
       ready = true;
       var c = new F.Component("__ROOT__", $(global.document), env);
       c.loadChildren(function(){
         console.timeEnd("F.construct");
-        if (callback) callback();
+        if (callback) {
+          callback();
+        }
       });
     });
   };
 
-  namespace.forEachAsync = function(items, onEach, onDone) {
+})(window);
+
+
+// Source: src/utils.js
+(function(namespace){
+  namespace.forEachAsync = function(items, asyncCall, done) {
     var len = items.length;
-    if (!len) return onDone();
+    if (!len) return done();
     var i = 0, complete = 0;
     for (; i<len; ++i) {
-      onEach(items[i], function(){
-        if (++complete === len) onDone();
+      asyncCall(items[i], function(){
+        if (++complete === len) done();
       });
     }
   };
-})(window);
+
+  namespace.createAsyncCall = function(){
+    var listeners = {};
+    var cache = {};
+
+    var releaseListeners = function(key, result) {
+      listeners[key].forEach(function(v){
+        v(result);
+      });
+      delete listeners[key];
+    };
+
+    return function(key, main, param, callback) {
+      if (key in cache) {
+        callback(cache[key]);
+        return;
+      }
+      if (key in listeners) {
+        listeners[key].push(callback);
+        return;
+      }
+      var timeout = setTimeout(function(){
+        console.error('asyncCall timeout: ' + key);
+        releaseListeners(key);
+      }, 20000);
+
+      listeners[key] = [callback];
+
+      main(key, param, function(result, multiple){
+        clearTimeout(timeout);
+        var cbRes;
+        if (multiple) {
+          for (var i in result) {
+            cache[i] = result[i];
+          }
+          cbRes = result[key];
+        } else {
+          cache[key] = result;
+          cbRes = result;
+        }
+        releaseListeners(key, cbRes);
+      });
+    }
+  };
+
+})(window.F.__);
 
 
 // Source: src/require.js
@@ -75,79 +133,73 @@
     };
   })();
 
-  namespace.ObjectLoader = (function(){
-    // var data = null;
-    // var queue = [];
+  (function(){
+    var data = null;
+    var dataOwner = null;
+    var ownerCount = 0;
+    var queue = [];
 
-    // var lock = {
-    //   get: function(){
-    //     if (!data) {
-    //       data = {};
-    //       return true;
-    //     }
-    //     return false;
-    //   },
-    //   release: function(){
-    //     data = null;
-    //   },
-    // };
+    var release = function(name){
+      if (name !== dataOwner) return false;
+      --ownerCount;
+      data = {};
+      if (ownerCount === 0) {
+        dataOwner = null;
+        ownerCount = 0;
+      }
+      return true;
+    };
 
-    // var lockedCall = function(func) {
-    //   if (!lock.get()) {
-    //     queue.push(func);
-    //     return false;
-    //   } else {
-    //     func(function(){
-    //       lock.release();
-    //       if (queue.length) {
-    //         lockedCall(queue.shift());
-    //       }
-    //     });
-    //     return true;
-    //   }
-    // };
+    var lock = function(name) {
+      if (!dataOwner || dataOwner === name) {
+        dataOwner = name;
+        ++ownerCount;
+        data = {};
+        return true;
+      } else {
+        return false;
+      }
+    };
 
-    data = {}; // TODO remove me
-    return {
-      component: {
-        define: function(name, constructor) {
-          data.components[name] = constructor;
-        },
-        load: function(url, callback) {
-          // var res = lockedCall(function(lockedCallback){
-          //   data.components = {};
-          //   namespace.require(url, function(){
-          //     var components = data.components;
-          //     lockedCallback();
-          //     callback(components);
-          //   });
-          // });
-          // console.debug("lockedCall", url, res);
-          data.components = {};
+    var loadObjects = (function(){
+      var asyncCall = namespace.createAsyncCall();
+
+      var main = function(url, name, callback) {
+        if (lock(name)) {
           namespace.require(url, function(){
-            var components = data.components;
-            callback(components);
+            var loadedData = data;
+            release(name);
+            if (queue.length) queue.shift()();
+            callback(loadedData);
           });
-        },
-      },
-      config: {
-        define: function(config) {
-          data.config = config;
-        },
-        load: function(url, callback) {
-          // lockedCall(function(lockedCallback){
-          //   namespace.require(url, function(){
-          //     var config = data.config;
-          //     lockedCallback();
-          //     callback(config);
-          //   });
-          // });
-          namespace.require(url, function(){
-            var config = data.config;
-            callback(config);
+        } else {
+          queue.push(function(){
+            main(url, name, callback);
           });
-        },
-      },
+        }
+      };
+
+      return function(name, url, callback) {
+        asyncCall(url, main, name, callback);
+      };
+    })();
+
+    namespace.define = function(name, constructor) {
+      data[name] = constructor;
+    };
+
+    namespace.requireComponents = function(envName, url, callback) {
+      loadObjects("component." + envName, url, callback);
+    };
+
+    namespace.requireConfig = function(url, callback) {
+      loadObjects("config", url, function(data){
+        for (var i in data) {
+          callback(data[i]);
+          return;
+        }
+        callback();
+      });
     };
   })();
 
@@ -165,6 +217,7 @@
       var container = document.getElementsByTagName("head")[0];
       container.appendChild(element);
     };
+
     var byAjax = function(url, callback){
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
@@ -180,6 +233,7 @@
       }
       xhr.send("");
     };
+
     var Type2Getter = {
       "js": function(url, callback) {
         var el = document.createElement("script");
@@ -195,42 +249,22 @@
       },
       "tmpl": byAjax
     };
-    var singleRequire = (function(){
-      var listeners = {};
-      var cache = {};
 
-      var releaseListeners = function(url, data) {
-        listeners[url].forEach(function(v){
-          v(data);
+    var singleRequire = (function(){
+      var asyncCall = namespace.createAsyncCall();
+
+      var main = function(url, param, callback) {
+        var type = getResourceType(url);
+        Type2Getter[type](url, function(err, data) {
+          if (err) {
+            console.error('Require error: ' + err);
+          }
+          callback(data);
         });
-        delete listeners[url];
       };
 
       return function(url, callback) {
-        if (url in cache) {
-          callback(cache[url]);
-          return;
-        }
-        if (url in listeners) {
-          listeners[url].push(callback);
-          return;
-        }
-
-        var timeout = setTimeout(function(){
-          console.error('Require timeout: ' + url);
-          releaseListeners(url);
-        }, 10000);
-        listeners[url] = [callback];
-        var type = getResourceType(url);
-        Type2Getter[type](url, function(err, data) {
-          clearTimeout(timeout);
-          if (err) {
-            console.error('Require error: ' + err);
-          } else {
-            cache[url] = data;
-          }
-          releaseListeners(url, data);
-        });
+        asyncCall(url, main, null, callback);
       };
     })();
 
@@ -353,8 +387,8 @@
         Render: function(template, data, options) { return template.render(data, options); },
       },
       Prefix: {
-        Component: "components/",
-        Template: "templates/",
+        Component: "/",
+        Template: "/",
       },
       Envs: {},
       Requires: [],
@@ -379,7 +413,9 @@
           self[v][i] = self[v][i] || defaultConfig[v][i];
         }
       });
+      self.asyncCall = namespace.createAsyncCall();
     };
+
     var proto = Env.prototype;
     proto.resolveUrl = function(name) {
       if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
@@ -389,7 +425,7 @@
     proto.init = function(callback) {
       var self = this;
       for (var i in self.Envs) {
-        EnvDescs[i] = self.Envs[i];
+        EnvDescs[i] = self.resolveUrl(self.Envs[i]);
       }
       self.require([self.DomParser, self.Template.Engine], function(){
         $.event.special.destroyed = {
@@ -398,7 +434,7 @@
           }
         };
         self.require(self.Requires, function(){
-          callback(self);
+          callback();
         });
       });
     };
@@ -437,86 +473,79 @@
       };
     })();
 
-    proto.getComponentClass = function(name, callback){
-      var self = this;
-      if (name.indexOf(":") >= 0) {
-        var parts = name.split(":");
-        var envName = parts[0];
-        var componentName = parts[1];
-        getOrCreateEnv(self, envName, function(env){
-          env.getComponentClass(componentName, callback);
+    proto.getComponentClass = (function(){
+      var main = function(name, env, callback) {
+        var url = env.resolveUrl(env.Prefix.Component + name + ".js");
+        namespace.requireComponents(env.getName(), url, function(components){
+          if (!(name in components)) {
+            throw new Error("getComponentClass: " + name + " is not found in " + url);
+          }
+          callback(components, true);
         });
-      } else {
-        if (name in self.components) {
-          callback(self.components[name], name, self);
+      };
+
+      return function(fullName, callback) {
+        var self = this;
+        var envName, componentName;
+        if (fullName.indexOf(":") >= 0) {
+          var parts = fullName.split(":");
+          envName = parts[0] || self.getName();
+          componentName = parts[1];
         } else {
-          var url = self.resolveUrl(self.Prefix.Component + name + ".js");
-          namespace.ObjectLoader.component.load(url, function(components){
-            var asyncCalls = [];
-            for (var i in components) {
-              var constructor = components[i];
-              if (constructor.isComponent) {
-                self.components[i] = constructor;
-              } else {
-                // this componentClass will be generated from a function
-                asyncCalls.push({name: i, createClass: constructor});
-              }
-            }
-            namespace.forEachAsync(
-              asyncCalls,
-              function(v, cb){
-                v.createClass(self, function(componentClass){
-                  self.components[v.name] = componentClass;
-                  cb();
-                });
-              },
-              function(){
-                if (!(name in components)) {
-                  throw new Error("component " + name + " is not found in " + url);
-                }
-                callback(self.components[name], name, self);
-              }
-            );
-          }); // ObjectLoader.component.load
+          envName = self.getName();
+          componentName = fullName;
         }
-      }
-    };
+        if (envName !== self.getName()) {
+          resolveEnv(envName, function(env){
+            env.getComponentClass(componentName, callback);
+          });
+        } else {
+          self.asyncCall(componentName, main, self, function(constructor){
+            callback(constructor, componentName, self);
+          });
+        }
+      };
+    })();
 
     return Env;
   })();
 
-  var getOrCreateEnv = (function(){
-    var envs = {};
-    return function(env, envName, callback) {
-      if (!envName) return callback(namespace.defaultEnv);
-      if (envName in envs) return callback(envs[envName]);
-      if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
+  var resolveEnv = (function(){
+    var asyncCall = namespace.createAsyncCall();
 
-      var onEnvLoaded = function(env) {
-        envs[envName] = env;
+    var createEnv = function(name, url, config, callback) {
+      var env = new Env(name, url, config);
+      env.init(function(){
         callback(env);
-      };
+      });
+    };
 
-      var descUrl = env.resolveUrl(EnvDescs[envName]);
-      var ext = descUrl.split(".").pop();
+    var main = function(url, envName, callback) {
+      var ext = url.split(".").pop();
       if (ext !== "js") {
-        if (descUrl[descUrl.length - 1] !== "/") descUrl += "/";
-        var env = new Env(envName, descUrl);
-          env.init(onEnvLoaded);
+        if (url[url.length - 1] !== "/") url += "/";
+        createEnv(envName, url, null, callback);
       } else {
-        namespace.ObjectLoader.config.load(descUrl, function(config){
-          var env = new Env(envName, descUrl, config);
-          env.init(onEnvLoaded);
+        namespace.requireConfig(url, function(config){
+          createEnv(envName, url, config, callback);
         });
       }
     };
+
+    return function(envName, callback) {
+      if (!envName) return callback(defaultEnv);
+      if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
+      var url = EnvDescs[envName];
+      asyncCall(url, main, envName, callback);
+    }
   })();
 
+  var defaultEnv = null;
   namespace.createDefaultEnv = function(config, cb){
-    if (namespace.defaultEnv) return cb(namespace.defaultEnv);
+    if (defaultEnv) return cb(defaultEnv);
     var env = new Env("", "", config);
     env.init(function(){
-      namespace.defaultEnv = env;
+      defaultEnv = env;
       cb(env);
     });
   };
@@ -575,7 +604,16 @@
   })();
 
   var ComponentFilter = "[data-role=component]";
+
   var __defaultLoadHandler = function(callback, param) { callback(); };
+
+  var getConstructor = function(constructor, env, callback) {
+    if (constructor.isComponent) {
+      callback(constructor);
+    } else {
+      constructor(env, callback);
+    }
+  };
 
   namespace.Component = Class.extend({
     init: function(name, $container, env){
@@ -665,12 +703,18 @@
         if (callback) callback();
         return;
       }
+
       namespace.forEachAsync(components, function(container, cb){
         var $container = $(container);
-        var name = $container.data('name');
-        self.F.getComponentClass(name, function(componentClass, name, env){
-          var c = new componentClass(name, $container, env);
-          c.load(param, cb);
+        var fullName = $container.data("name");
+        self.F.getComponentClass(fullName, function(constructor, componentName, env){
+          getConstructor(constructor, env, function(constructor){
+            if (!constructor.isComponent) {
+              throw new Error("unexpected component class: " + env.getName() + ":" + componentName);
+            }
+            var c = new constructor(componentName, $container, env);
+            c.load(param, cb);
+          });
         });
       }, function(){
         if (callback) callback();
@@ -692,7 +736,7 @@
       if (!topic) {
         for (var i in this.subscribeList) namespace.Pubsub.unsubscribe(i, this.subscribeList[i]);
       } else {
-        if (topic in this.subscribeList) namspace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in this.subscribeList) namespace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     },
   });

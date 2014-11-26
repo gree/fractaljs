@@ -48,7 +48,16 @@
   })();
 
   var ComponentFilter = "[data-role=component]";
+
   var __defaultLoadHandler = function(callback, param) { callback(); };
+
+  var getConstructor = function(constructor, env, callback) {
+    if (constructor.isComponent) {
+      callback(constructor);
+    } else {
+      constructor(env, callback);
+    }
+  };
 
   namespace.Component = Class.extend({
     init: function(name, $container, env){
@@ -139,12 +148,18 @@
         if (callback) callback();
         return;
       }
+
       namespace.forEachAsync(components, function(container, cb){
         var $container = $(container);
-        var name = $container.data('name');
-        self.F.getComponentClass(name, function(componentClass, name, env){
-          var c = new componentClass(name, $container, env);
-          c.load(param, cb);
+        var fullName = $container.data("name");
+        self.F.getComponentClass(fullName, function(constructor, componentName, env){
+          getConstructor(constructor, env, function(constructor){
+            if (!constructor.isComponent) {
+              throw new Error("unexpected component class: " + env.getName() + ":" + componentName);
+            }
+            var c = new constructor(componentName, $container, env);
+            c.load(param, cb);
+          });
         });
       }, function(){
         if (callback) callback();
@@ -166,7 +181,7 @@
       if (!topic) {
         for (var i in this.subscribeList) namespace.Pubsub.unsubscribe(i, this.subscribeList[i]);
       } else {
-        if (topic in this.subscribeList) namspace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in this.subscribeList) namespace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     },
   });

@@ -1,6 +1,6 @@
 F({
   Envs: {
-    font: "font/",
-    color: "color/index.js",
+    font: "font/index.js",
+    color: "color/",
   },
 });

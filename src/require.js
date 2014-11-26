@@ -16,10 +16,9 @@
     var release = function(name){
       if (name !== dataOwner) return false;
       --ownerCount;
-      console.debug("release", dataOwner, ownerCount);
+      data = {};
       if (ownerCount === 0) {
         console.debug("release done", dataOwner);
-        data = null;
         dataOwner = null;
         ownerCount = 0;
       }
@@ -27,8 +26,7 @@
     };
 
     var lock = function(name) {
-      if (!dataOwner){
-      //if (!dataOwner || dataOwner === name) {
+      if (!dataOwner || dataOwner === name) {
         dataOwner = name;
         ++ownerCount;
         data = {};
@@ -39,24 +37,32 @@
       }
     };
 
-    var loadObjects = function(name, url, callback) {
-      console.debug("loadObjects", name, url);
-      if (lock(name)) {
-        namespace.require(url, function(){
-          var loadedData = data;
-          release(name);
-          if (queue.length) queue.shift()();
-          callback(loadedData);
-        });
-      } else {
-        queue.push(function(){
-          loadObjects(name, url, callback);
-        });
-      }
-    };
+    var loadObjects = (function(){
+      var asyncCall = namespace.createAsyncCall();
+
+      var main = function(url, name, callback) {
+        console.debug("loadObjects", name, url);
+        if (lock(name)) {
+          namespace.require(url, function(){
+            var loadedData = data;
+            release(name);
+            if (queue.length) queue.shift()();
+            callback(loadedData);
+          });
+        } else {
+          queue.push(function(){
+            main(url, name, callback);
+          });
+        }
+      };
+
+      return function(name, url, callback) {
+        asyncCall(url, main, name, callback);
+      };
+    })();
 
     namespace.define = function(name, constructor) {
-      console.debug("define", name, "dataOwner", dataOwner);
+      console.debug("define", (name || "config"), "dataOwner", dataOwner);
       data[name] = constructor;
     };
 
@@ -66,93 +72,12 @@
 
     namespace.requireConfig = function(url, callback) {
       loadObjects("config", url, function(data){
-        if (data) {
-          for (var i in data) {
-            callback(data[i]);
-            break;
-          }
-        } else {
-          callback();
+        for (var i in data) {
+          callback(data[i]);
+          return;
         }
+        callback();
       });
-    };
-  })();
-
-  namespace.ObjectLoader = (function(){
-    // var data = null;
-    // var queue = [];
-
-    // var lock = {
-    //   get: function(){
-    //     if (!data) {
-    //       data = {};
-    //       return true;
-    //     }
-    //     return false;
-    //   },
-    //   release: function(){
-    //     data = null;
-    //   },
-    // };
-
-    // var lockedCall = function(func) {
-    //   if (!lock.get()) {
-    //     queue.push(func);
-    //     return false;
-    //   } else {
-    //     func(function(){
-    //       lock.release();
-    //       if (queue.length) {
-    //         lockedCall(queue.shift());
-    //       }
-    //     });
-    //     return true;
-    //   }
-    // };
-
-    data = {}; // TODO remove me
-    return {
-      component: {
-        define: function(name, constructor) {
-          data.components[name] = constructor;
-        },
-        load: function(url, callback) {
-          // var res = lockedCall(function(lockedCallback){
-          //   data.components = {};
-          //   namespace.require(url, function(){
-          //     var components = data.components;
-          //     lockedCallback();
-          //     callback(components);
-          //   });
-          // });
-          // console.debug("lockedCall", url, res);
-          console.log("load", url);
-          data.components = {};
-          namespace.require(url, function(){
-            var components = data.components;
-            console.log("load done", url);
-            callback(components);
-          });
-        },
-      },
-      config: {
-        define: function(config) {
-          data.config = config;
-        },
-        load: function(url, callback) {
-          // lockedCall(function(lockedCallback){
-          //   namespace.require(url, function(){
-          //     var config = data.config;
-          //     lockedCallback();
-          //     callback(config);
-          //   });
-          // });
-          namespace.require(url, function(){
-            var config = data.config;
-            callback(config);
-          });
-        },
-      },
     };
   })();
 
@@ -170,6 +95,7 @@
       var container = document.getElementsByTagName("head")[0];
       container.appendChild(element);
     };
+
     var byAjax = function(url, callback){
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
@@ -185,6 +111,7 @@
       }
       xhr.send("");
     };
+
     var Type2Getter = {
       "js": function(url, callback) {
         var el = document.createElement("script");
@@ -200,42 +127,23 @@
       },
       "tmpl": byAjax
     };
-    var singleRequire = (function(){
-      var listeners = {};
-      var cache = {};
 
-      var releaseListeners = function(url, data) {
-        listeners[url].forEach(function(v){
-          v(data);
+    var singleRequire = (function(){
+      var asyncCall = namespace.createAsyncCall();
+
+      var main = function(url, param, callback) {
+        var type = getResourceType(url);
+        console.log("network require", url)
+        Type2Getter[type](url, function(err, data) {
+          if (err) {
+            console.error('Require error: ' + err);
+          }
+          callback(data);
         });
-        delete listeners[url];
       };
 
       return function(url, callback) {
-        if (url in cache) {
-          callback(cache[url]);
-          return;
-        }
-        if (url in listeners) {
-          listeners[url].push(callback);
-          return;
-        }
-
-        var timeout = setTimeout(function(){
-          console.error('Require timeout: ' + url);
-          releaseListeners(url);
-        }, 10000);
-        listeners[url] = [callback];
-        var type = getResourceType(url);
-        Type2Getter[type](url, function(err, data) {
-          clearTimeout(timeout);
-          if (err) {
-            console.error('Require error: ' + err);
-          } else {
-            cache[url] = data;
-          }
-          releaseListeners(url, data);
-        });
+        asyncCall(url, main, null, callback);
       };
     })();
 

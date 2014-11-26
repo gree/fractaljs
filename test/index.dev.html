@@ -7,6 +7,7 @@
     <div data-role="component" data-name="main"></div>
 
     <script type="text/javascript" src="../src/interface.js"></script>
+    <script type="text/javascript" src="../src/utils.js"></script>
     <script type="text/javascript" src="../src/require.js"></script>
     <script type="text/javascript" src="../src/pubsub.js"></script>
     <script type="text/javascript" src="../src/env.js"></script>
@@ -22,7 +23,7 @@
           namespace: "namespace/config.js",
           recursive: "recursive/",
           list: "list/",
-          require: "require/",
+          require: "require/config.js",
         },
       };
       F.construct(config);

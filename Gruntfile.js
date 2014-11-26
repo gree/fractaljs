@@ -22,6 +22,7 @@ module.exports = function (grunt) {
       dist: {
         src: [
           'src/interface.js',
+          'src/utils.js',
           'src/require.js',
           'src/pubsub.js',
           'src/env.js',

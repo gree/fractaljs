@@ -3,6 +3,5 @@ node_modules
 \#*
 \.\#*
 .DS_Store
-foreach_*.js
-foreach_*.tmpl
+__generated__/
 
