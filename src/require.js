@@ -1,4 +1,7 @@
 (function(namespace){
+  var TYPE = namespace.ClassType;
+  var createAsyncCall = namespace.createAsyncCall;
+
   var getResourceType = (function(){
     var KNOWN_TYPES = {js:1, css:1, tmpl:1};
     return function(name) {
@@ -10,27 +13,28 @@
   (function(){
     var data = null;
     var dataOwner = null;
-    var ownerCount = 0;
+    var refCount = 0;
     var queue = [];
 
     var release = function(name){
       if (name !== dataOwner) return false;
-      --ownerCount;
+      --refCount;
+      var refCopy = data;
       data = {};
-      if (ownerCount === 0) {
+      if (refCount === 0) {
         console.debug("release done", dataOwner);
         dataOwner = null;
-        ownerCount = 0;
+        refCount = 0;
       }
-      return true;
+      return refCopy;
     };
 
     var lock = function(name) {
       if (!dataOwner || dataOwner === name) {
         dataOwner = name;
-        ++ownerCount;
+        ++refCount;
         data = {};
-        console.debug("lock", dataOwner, ownerCount);
+        console.debug("lock", dataOwner, refCount);
         return true;
       } else {
         return false;
@@ -38,16 +42,15 @@
     };
 
     var loadObjects = (function(){
-      var asyncCall = namespace.createAsyncCall();
+      var asyncCall = createAsyncCall();
 
       var main = function(url, name, callback) {
         console.debug("loadObjects", name, url);
         if (lock(name)) {
-          namespace.require(url, function(){
-            var loadedData = data;
-            release(name);
+          require(url, function(){
+            var data = release(name);
             if (queue.length) queue.shift()();
-            callback(loadedData);
+            callback(data);
           });
         } else {
           queue.push(function(){
@@ -62,26 +65,25 @@
     })();
 
     namespace.define = function(name, constructor) {
-      console.debug("define", (name || "config"), "dataOwner", dataOwner);
+      console.debug("define", name, "dataOwner", dataOwner);
       data[name] = constructor;
     };
 
     namespace.requireComponents = function(envName, url, callback) {
-      loadObjects("component." + envName, url, callback);
+      loadObjects(TYPE.COMPONENT + "." + envName, url, callback);
     };
 
     namespace.requireConfig = function(url, callback) {
-      loadObjects("config", url, function(data){
-        for (var i in data) {
-          callback(data[i]);
-          return;
+      loadObjects(TYPE.ENVCONFIG, url, function(items){
+        for(var i in items) {
+          return callback(items[i]);
         }
         callback();
       });
     };
   })();
 
-  namespace.require = (function(){
+  var require = namespace.require = (function(){
     var byAddingElement = function(element, callback) {
       var done = false;
       element.onload = element.onreadystatechange = function(){
@@ -129,7 +131,7 @@
     };
 
     var singleRequire = (function(){
-      var asyncCall = namespace.createAsyncCall();
+      var asyncCall = createAsyncCall();
 
       var main = function(url, param, callback) {
         var type = getResourceType(url);

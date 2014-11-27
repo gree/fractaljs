@@ -1,65 +1,21 @@
 (function(namespace){
-  var Class = (function(){
-    /* Simple JavaScript Inheritance
-     * By John Resig http://ejohn.org/
-     * MIT Licensed.
-     */
-    // Inspired by base2 and Prototype
-    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
-    var Class = function(){};
-    Class.extend = function(prop) {
-      var _super = this.prototype;
-
-      initializing = true;
-      var prototype = new this();
-      initializing = false;
-
-      for (var name in prop) {
-        prototype[name] = typeof prop[name] == "function" &&
-          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-          (function(name, fn){
-            return function() {
-              var tmp = this._super;
-              this._super = _super[name];
-
-              var ret = fn.apply(this, arguments);
-              this._super = tmp;
-
-              return ret;
-            };
-          })(name, prop[name]) :
-        prop[name];
-      }
-
-      var Class = function(){
-        if ( !initializing && this.init )
-          this.init.apply(this, arguments);
-      }
-
-      Class.prototype = prototype;
-      Class.prototype.constructor = Class;
-
-      Class.extend = arguments.callee;
-      Class.isComponent = true;
-      return Class;
-    };
-
-    return Class;
-  })();
+  // import
+  var isClass = namespace.isClass;
+  var pubsub = namespace.Pubsub;
+  var COMPONENT = namespace.ClassType.COMPONENT;
 
   var ComponentFilter = "[data-role=component]";
-
   var __defaultLoadHandler = function(callback, param) { callback(); };
 
   var getConstructor = function(constructor, env, callback) {
-    if (constructor.isComponent) {
+    if (isClass(constructor, COMPONENT)) {
       callback(constructor);
     } else {
       constructor(env, callback);
     }
   };
 
-  namespace.Component = Class.extend({
+  namespace.Component = namespace.defineClass(COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;
@@ -154,7 +110,7 @@
         var fullName = $container.data("name");
         self.F.getComponentClass(fullName, function(constructor, componentName, env){
           getConstructor(constructor, env, function(constructor){
-            if (!constructor.isComponent) {
+            if (!isClass(constructor, COMPONENT)) {
               throw new Error("unexpected component class: " + env.getName() + ":" + componentName);
             }
             var c = new constructor(componentName, $container, env);
@@ -169,19 +125,19 @@
     unload: function(){ this.unsubscribe(); },
 
     require: function(name, options, callback) { this.F.require(name, options, callback); },
-    publish: function(topic, data) { namespace.Pubsub.publish(topic, data, this); },
+    publish: function(topic, data) { pubsub.publish(topic, data, this); },
     subscribe: function(topic, callback){
       var self = this;
-      self.subscribeList[topic] = namespace.Pubsub.subscribe(topic, function(topic, data, from){
+      self.subscribeList[topic] = pubsub.subscribe(topic, function(topic, data, from){
         if (self.rendered) callback(topic, data, from);
         else self.earlyRecieved.push(function(){ callback(topic, data, from); });
       });
     },
     unsubscribe: function(topic) {
       if (!topic) {
-        for (var i in this.subscribeList) namespace.Pubsub.unsubscribe(i, this.subscribeList[i]);
+        for (var i in this.subscribeList) pubsub.unsubscribe(i, this.subscribeList[i]);
       } else {
-        if (topic in this.subscribeList) namespace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in this.subscribeList) pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     },
   });

@@ -120,11 +120,73 @@
     }
   };
 
+  namespace.defineClass = function(type){
+    /* Simple JavaScript Inheritance
+     * By John Resig http://ejohn.org/
+     * MIT Licensed.
+     */
+    // Inspired by base2 and Prototype
+    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
+    var Class = function(){};
+    Class.extend = function(prop) {
+      var _super = this.prototype;
+
+      initializing = true;
+      var prototype = new this();
+      initializing = false;
+
+      for (var name in prop) {
+        prototype[name] = typeof prop[name] == "function" &&
+          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
+          (function(name, fn){
+            return function() {
+              var tmp = this._super;
+              this._super = _super[name];
+
+              var ret = fn.apply(this, arguments);
+              this._super = tmp;
+
+              return ret;
+            };
+          })(name, prop[name]) :
+        prop[name];
+      }
+
+      var Class = function(){
+        if ( !initializing && this.init )
+          this.init.apply(this, arguments);
+      }
+
+      Class.prototype = prototype;
+      Class.prototype.constructor = Class;
+
+      Class.extend = arguments.callee;
+      Class.getType = function() { return type; };
+      return Class;
+    };
+
+    return Class;
+  };
+
+  namespace.isClass = function(object, type) {
+    if (!object.getType) return false;
+    if (!type) return true
+    return object.getType() === type;
+  };
+
+  namespace.ClassType = {
+    COMPONENT: 1,
+    ENVCONFIG: 2
+  };
+
 })(window.F.__);
 
 
 // Source: src/require.js
 (function(namespace){
+  var TYPE = namespace.ClassType;
+  var createAsyncCall = namespace.createAsyncCall;
+
   var getResourceType = (function(){
     var KNOWN_TYPES = {js:1, css:1, tmpl:1};
     return function(name) {
@@ -136,24 +198,25 @@
   (function(){
     var data = null;
     var dataOwner = null;
-    var ownerCount = 0;
+    var refCount = 0;
     var queue = [];
 
     var release = function(name){
       if (name !== dataOwner) return false;
-      --ownerCount;
+      --refCount;
+      var refCopy = data;
       data = {};
-      if (ownerCount === 0) {
+      if (refCount === 0) {
         dataOwner = null;
-        ownerCount = 0;
+        refCount = 0;
       }
-      return true;
+      return refCopy;
     };
 
     var lock = function(name) {
       if (!dataOwner || dataOwner === name) {
         dataOwner = name;
-        ++ownerCount;
+        ++refCount;
         data = {};
         return true;
       } else {
@@ -162,15 +225,14 @@
     };
 
     var loadObjects = (function(){
-      var asyncCall = namespace.createAsyncCall();
+      var asyncCall = createAsyncCall();
 
       var main = function(url, name, callback) {
         if (lock(name)) {
-          namespace.require(url, function(){
-            var loadedData = data;
-            release(name);
+          require(url, function(){
+            var data = release(name);
             if (queue.length) queue.shift()();
-            callback(loadedData);
+            callback(data);
           });
         } else {
           queue.push(function(){
@@ -189,21 +251,20 @@
     };
 
     namespace.requireComponents = function(envName, url, callback) {
-      loadObjects("component." + envName, url, callback);
+      loadObjects(TYPE.COMPONENT + "." + envName, url, callback);
     };
 
     namespace.requireConfig = function(url, callback) {
-      loadObjects("config", url, function(data){
-        for (var i in data) {
-          callback(data[i]);
-          return;
+      loadObjects(TYPE.ENVCONFIG, url, function(items){
+        for(var i in items) {
+          return callback(items[i]);
         }
         callback();
       });
     };
   })();
 
-  namespace.require = (function(){
+  var require = namespace.require = (function(){
     var byAddingElement = function(element, callback) {
       var done = false;
       element.onload = element.onreadystatechange = function(){
@@ -251,7 +312,7 @@
     };
 
     var singleRequire = (function(){
-      var asyncCall = namespace.createAsyncCall();
+      var asyncCall = createAsyncCall();
 
       var main = function(url, param, callback) {
         var type = getResourceType(url);
@@ -555,67 +616,23 @@
 
 // Source: src/component.js
 (function(namespace){
-  var Class = (function(){
-    /* Simple JavaScript Inheritance
-     * By John Resig http://ejohn.org/
-     * MIT Licensed.
-     */
-    // Inspired by base2 and Prototype
-    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
-    var Class = function(){};
-    Class.extend = function(prop) {
-      var _super = this.prototype;
-
-      initializing = true;
-      var prototype = new this();
-      initializing = false;
-
-      for (var name in prop) {
-        prototype[name] = typeof prop[name] == "function" &&
-          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-          (function(name, fn){
-            return function() {
-              var tmp = this._super;
-              this._super = _super[name];
-
-              var ret = fn.apply(this, arguments);
-              this._super = tmp;
-
-              return ret;
-            };
-          })(name, prop[name]) :
-        prop[name];
-      }
-
-      var Class = function(){
-        if ( !initializing && this.init )
-          this.init.apply(this, arguments);
-      }
-
-      Class.prototype = prototype;
-      Class.prototype.constructor = Class;
-
-      Class.extend = arguments.callee;
-      Class.isComponent = true;
-      return Class;
-    };
-
-    return Class;
-  })();
+  // import
+  var isClass = namespace.isClass;
+  var pubsub = namespace.Pubsub;
+  var COMPONENT = namespace.ClassType.COMPONENT;
 
   var ComponentFilter = "[data-role=component]";
-
   var __defaultLoadHandler = function(callback, param) { callback(); };
 
   var getConstructor = function(constructor, env, callback) {
-    if (constructor.isComponent) {
+    if (isClass(constructor, COMPONENT)) {
       callback(constructor);
     } else {
       constructor(env, callback);
     }
   };
 
-  namespace.Component = Class.extend({
+  namespace.Component = namespace.defineClass(COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;
@@ -709,7 +726,7 @@
         var fullName = $container.data("name");
         self.F.getComponentClass(fullName, function(constructor, componentName, env){
           getConstructor(constructor, env, function(constructor){
-            if (!constructor.isComponent) {
+            if (!isClass(constructor, COMPONENT)) {
               throw new Error("unexpected component class: " + env.getName() + ":" + componentName);
             }
             var c = new constructor(componentName, $container, env);
@@ -724,19 +741,19 @@
     unload: function(){ this.unsubscribe(); },
 
     require: function(name, options, callback) { this.F.require(name, options, callback); },
-    publish: function(topic, data) { namespace.Pubsub.publish(topic, data, this); },
+    publish: function(topic, data) { pubsub.publish(topic, data, this); },
     subscribe: function(topic, callback){
       var self = this;
-      self.subscribeList[topic] = namespace.Pubsub.subscribe(topic, function(topic, data, from){
+      self.subscribeList[topic] = pubsub.subscribe(topic, function(topic, data, from){
         if (self.rendered) callback(topic, data, from);
         else self.earlyRecieved.push(function(){ callback(topic, data, from); });
       });
     },
     unsubscribe: function(topic) {
       if (!topic) {
-        for (var i in this.subscribeList) namespace.Pubsub.unsubscribe(i, this.subscribeList[i]);
+        for (var i in this.subscribeList) pubsub.unsubscribe(i, this.subscribeList[i]);
       } else {
-        if (topic in this.subscribeList) namespace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in this.subscribeList) pubsub.unsubscribe(topic, this.subscribeList[topic]);
       }
     },
   });
