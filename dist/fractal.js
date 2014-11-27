@@ -10,18 +10,12 @@
     if (typeof(arg1) === 'function') {
       // 'onready' event handler
       callback = arg1;
-    } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') {
-      // define a component
-      var name = arg1, component = arg2;
+    } else if (typeof(arg1) === 'string' && arg2) {
+      // define an object
+      var name = arg1, object = arg2;
       callback = function(){
-        namespace.define(name, component);
+        namespace.define(name, object);
       };
-    } else if (typeof(arg1) === 'object') {
-      // env config
-      var config = arg1;
-      callback = function(){
-        namespace.define("", config);
-      }
     }
 
     if (!callback) {
@@ -81,6 +75,7 @@
     var cache = {};
 
     var releaseListeners = function(key, result) {
+      //console.debug("asyncCall", key, "listeners", listeners[key].length);
       listeners[key].forEach(function(v){
         v(result);
       });
@@ -255,12 +250,7 @@
     };
 
     namespace.requireConfig = function(url, callback) {
-      loadObjects(TYPE.ENVCONFIG, url, function(items){
-        for(var i in items) {
-          return callback(items[i]);
-        }
-        callback();
-      });
+      loadObjects(TYPE.ENVCONFIG, url, callback);
     };
   })();
 
@@ -436,6 +426,9 @@
 
 // Source: src/env.js
 (function(namespace, global){
+  var createAsyncCall = namespace.createAsyncCall;
+  var require = namespace.require;
+
   var EnvDescs = {};
 
   var Env = (function(){
@@ -474,7 +467,7 @@
           self[v][i] = self[v][i] || defaultConfig[v][i];
         }
       });
-      self.asyncCall = namespace.createAsyncCall();
+      self.asyncCall = createAsyncCall();
     };
 
     var proto = Env.prototype;
@@ -503,9 +496,9 @@
     proto.require = function(names, callback){
       var self = this;
       if (!Array.isArray(names)) {
-        namespace.require(self.resolveUrl(names), callback);
+        require(self.resolveUrl(names), callback);
       } else {
-        namespace.require(names.map(function(v){ return self.resolveUrl(v); }), callback);
+        require(names.map(function(v){ return self.resolveUrl(v); }), callback);
       }
     };
 
@@ -538,9 +531,6 @@
       var main = function(name, env, callback) {
         var url = env.resolveUrl(env.Prefix.Component + name + ".js");
         namespace.requireComponents(env.getName(), url, function(components){
-          if (!(name in components)) {
-            throw new Error("getComponentClass: " + name + " is not found in " + url);
-          }
           callback(components, true);
         });
       };
@@ -572,7 +562,7 @@
   })();
 
   var resolveEnv = (function(){
-    var asyncCall = namespace.createAsyncCall();
+    var asyncCall = createAsyncCall();
 
     var createEnv = function(name, url, config, callback) {
       var env = new Env(name, url, config);
@@ -587,7 +577,8 @@
         if (url[url.length - 1] !== "/") url += "/";
         createEnv(envName, url, null, callback);
       } else {
-        namespace.requireConfig(url, function(config){
+        namespace.requireConfig(url, function(configs){
+          var config = configs[envName];
           createEnv(envName, url, config, callback);
         });
       }
