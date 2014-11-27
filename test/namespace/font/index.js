@@ -1,7 +1,5 @@
-F("font", {
-  Prefix: {
-    Component: 'components/',
-    Template: 'templates/',
-  }
-});
+F("font", F.Env.extend({
+  PrefixComponent: 'components/',
+  PrefixTemplate: 'templates/',
+}));
 

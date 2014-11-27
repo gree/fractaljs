@@ -1,4 +1,4 @@
-(function(namespace){
+F(function(namespace){
   // TODO replace with faster algorithm, data structure
   var MaxStocked = 100;
   var Stock = function(){
@@ -80,5 +80,5 @@
       },
     };
   }());
-})(window.F.__);
+});
 

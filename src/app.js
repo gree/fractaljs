@@ -1,8 +1,8 @@
-F(function(){
-  var namespace = {};
+F(function(namespace){
+  var app = F.app = {};
   var PageKey = "page";
 
-  var decodeParam = namespace.decodeParam = function(queryString){
+  var decodeParam = app.decodeParam = function(queryString){
     if (!queryString) return {};
     var match,
     pl     = /\+/g,  // Regex for replacing addition symbol with a space
@@ -20,7 +20,7 @@ F(function(){
     return myQuery;
   };
 
-  var encodeParam = namespace.encodeParam = function(data) {
+  var encodeParam = app.encodeParam = function(data) {
     var kvp = [];
     for (var i in data) {
       if (i === PageKey) continue;
@@ -31,7 +31,7 @@ F(function(){
     }).join("&");
   };
 
-  namespace.navigate = function(page, params, silent) {
+  app.navigate = function(page, params, silent) {
     var hash = "#" + page + (params ? ("&" + encodeParam(params)) : "");
     if (window.location.hash !== hash) {
       if (silent) {
@@ -42,7 +42,7 @@ F(function(){
     }
   };
 
-  namespace.query = (function(){
+  app.query = (function(){
     var query = {};
 
     function parse() {
@@ -67,7 +67,7 @@ F(function(){
     window.onpopstate = function(){
       var changed = parse();
       for (var i in changed) {
-        F.__.Pubsub.publish("app.query.changed", changed);
+        namespace.Pubsub.publish("app.query.changed", changed);
         break;
       }
     };
@@ -76,7 +76,7 @@ F(function(){
     return query;
   })();
 
-  namespace.Router = F.Component.extend({
+  app.Router = namespace.Component.extend({
     getDefaultName: function() { throw new Error("to be extended"); },
     getComponentName: function(changedQuery, callback) { throw new Error("to be extended"); },
     template: '{{#name}}<div data-role="component" data-name="{{name}}" />{{/name}}',
@@ -99,7 +99,7 @@ F(function(){
     }
   });
 
-  namespace.platform = (function(){
+  app.platform = (function(){
     if (window.location.href.indexOf("http") == 0) return "www";
     var isAndroid = !!(navigator.userAgent.match(/Android/i));
     var isIOS     = !!(navigator.userAgent.match(/iPhone|iPad|iPod/i));
@@ -108,7 +108,5 @@ F(function(){
     else if (isIOS) return "ios";
     else return "www";
   })();
-
-  F.app = namespace;
 });
 

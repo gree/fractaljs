@@ -1,4 +1,4 @@
-(function(namespace){
+F(function(namespace){
   namespace.forEachAsync = function(items, asyncCall, done) {
     var len = items.length;
     if (!len) return done();
@@ -111,8 +111,8 @@
 
   namespace.ClassType = {
     COMPONENT: 1,
-    ENVCONFIG: 2
+    ENV: 2
   };
 
-})(window.F.__);
+});
 

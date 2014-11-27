@@ -1,4 +1,4 @@
-(function(namespace){
+F(function(namespace){
   // import
   var isClass = namespace.isClass;
   var pubsub = namespace.Pubsub;
@@ -35,7 +35,7 @@
       // self.children = [];
       // self.parent = null;
       self.templateName = self.templateName || self.name;
-      if (typeof(self.template) === "string") self.template = self.F.Template.Compile(self.template);
+      if (typeof(self.template) === "string") self.template = self.F.compile(self.template);
 
       var publicMethods = self.Public || {};
       for (var i in publicMethods) {
@@ -78,15 +78,25 @@
     getData: __defaultLoadHandler,
     getTemplate: function(callback, param) {
       var self = this;
-      if (self.template) return callback();
+      if (self.template) {
+        return callback();
+      }
+
+      var $tmpl = self.$('script[type="text/template"]');
+      if ($tmpl.length > 0) {
+        self.template = self.F.compile($tmpl.html());
+        return callback();
+      }
+
       self.F.getTemplate(self.templateName || self.name, function(template){
         self.template = template;
         callback();
       });
     },
     render: function(data, partials, callback, param){
-      var contents = this.F.Template.Render(this.template, data, partials);
-      this.$container.html(contents);
+      var self = this;
+      var contents = self.F.render(self.template, data, partials);
+      self.$container.html(contents);
       callback();
     },
     afterRender: __defaultLoadHandler,
@@ -141,5 +151,5 @@
       }
     },
   });
-})(window.F.__);
+});
 

@@ -27,25 +27,31 @@
   };
 
   F.__ = namespace;
-  F.construct = function(config, callback){
-    console.time("F.construct");
-    if (typeof(config) === "function") {
-      callback = config;
-      config = {};
+
+  F.init = function(callback) {
+    if (readyListeners && readyListeners.length) {
+      readyListeners.forEach(function(v){
+        v(F.__);
+      });
+      readyListeners = [];
     }
-    namespace.createDefaultEnv(config, function(env){
-      console.debug("defaultEnv", env);
+    ready = true;
 
-      F.Component = F.__.Component;
+    F.Component = F.__.Component;
+    F.Env = F.__.Env;
 
-      if (readyListeners && readyListeners.length) {
-        readyListeners.forEach(function(v){
-          v();
-        });
-        readyListeners = [];
-      }
-      ready = true;
-      var c = new F.Component("__ROOT__", $(global.document), env);
+    callback();
+  };
+
+  F.construct = function(env, callback){
+    console.time("F.construct");
+    if (typeof(env) === "function") {
+      callback = env;
+      env = null;
+    }
+    if (!env) env = new namespace.Env();
+    env.setup(function(){
+      var c = new F.Component("", $(global.document), env);
       c.loadChildren(function(){
         console.timeEnd("F.construct");
         if (callback) {

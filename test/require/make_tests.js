@@ -13,7 +13,7 @@ var getTemplate = function(name) {
 };
 
 var getConfig = function(name){
-  return 'F("' + name+ '", {});';
+  return 'F("' + name+ '", F.Env.extend({}));';
 }
 
 var getContainer = function(envName, name) {

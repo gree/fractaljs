@@ -14,19 +14,17 @@
     <script type="text/javascript" src="../src/component.js"></script>
     <script type="text/javascript" src="../src/app.js"></script>
     <script type="text/javascript">
-      var config = {
-        Prefix: {
-          Component: "main/",
-          Template: "main/",
-        },
-        Envs: {
-          namespace: "namespace/config.js",
-          recursive: "recursive/",
-          list: "list/",
-          require: "require/config.js",
-        },
-      };
-      F.construct(config);
+      F.init(function(){
+        var env = new (F.Env.extend({
+          Envs: {
+            namespace: "namespace/config.js",
+            recursive: "recursive/",
+            list: "list/",
+            require: "require/config.js",
+          },
+        }))("local");
+        F.construct(env);
+      });
     </script>
   </body>
 </html>

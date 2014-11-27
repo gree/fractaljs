@@ -1,4 +1,4 @@
-(function(namespace){
+F(function(namespace){
   var TYPE = namespace.ClassType;
   var createAsyncCall = namespace.createAsyncCall;
 
@@ -69,12 +69,12 @@
       data[name] = constructor;
     };
 
-    namespace.requireComponents = function(envName, url, callback) {
+    namespace.requireComponent = function(envName, url, callback) {
       loadObjects(TYPE.COMPONENT + "." + envName, url, callback);
     };
 
-    namespace.requireConfig = function(url, callback) {
-      loadObjects(TYPE.ENVCONFIG, url, callback);
+    namespace.requireEnv = function(url, callback) {
+      loadObjects(TYPE.ENV, url, callback);
     };
   })();
 
@@ -164,5 +164,5 @@
       );
     };
   })();
-})(window.F.__);
+});
 
