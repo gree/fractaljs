@@ -15,6 +15,7 @@
     var cache = {};
 
     var releaseListeners = function(key, result) {
+      //console.debug("asyncCall", key, "listeners", listeners[key].length);
       listeners[key].forEach(function(v){
         v(result);
       });

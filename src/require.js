@@ -74,12 +74,7 @@
     };
 
     namespace.requireConfig = function(url, callback) {
-      loadObjects(TYPE.ENVCONFIG, url, function(items){
-        for(var i in items) {
-          return callback(items[i]);
-        }
-        callback();
-      });
+      loadObjects(TYPE.ENVCONFIG, url, callback);
     };
   })();
 

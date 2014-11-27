@@ -12,8 +12,8 @@ var getTemplate = function(name) {
   return '<p>' + name + ': {{name}}</p>';
 };
 
-var getConfig = function(){
-  return 'F({});';
+var getConfig = function(name){
+  return 'F("' + name+ '", {});';
 }
 
 var getContainer = function(envName, name) {
@@ -29,6 +29,9 @@ var i=0;
 var forEachTemplate = "";
 for(; i<100; ++i){
   var group = parseInt(i/100);
+  var envName = "require_ns" + group;
+  var name = "foreach_" + i;
+
   var myPrefix = prefix + group + "/";
   if (!fs.existsSync(myPrefix)) {
     fs.mkdirSync(myPrefix);
@@ -36,17 +39,15 @@ for(; i<100; ++i){
 
   var myConfig = prefix + group + "/ns.js";
   if (!fs.existsSync(myConfig)) {
-    fs.writeFileSync(myConfig, getConfig());
+    fs.writeFileSync(myConfig, getConfig(envName));
   }
 
-  var name = "foreach_" + i;
   (function(fileName){
     fs.writeFileSync(fileName, getComponent(name));
   })(myPrefix + name + ".js");
   (function(fileName){
     fs.writeFileSync(fileName, getTemplate(name));
   })(myPrefix + name + ".tmpl");
-  var envName = "require_ns" + group;
   forEachTemplate += getContainer(envName, name);
 }
 

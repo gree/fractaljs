@@ -9,18 +9,12 @@
     if (typeof(arg1) === 'function') {
       // 'onready' event handler
       callback = arg1;
-    } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') {
-      // define a component
-      var name = arg1, component = arg2;
+    } else if (typeof(arg1) === 'string' && arg2) {
+      // define an object
+      var name = arg1, object = arg2;
       callback = function(){
-        namespace.define(name, component);
+        namespace.define(name, object);
       };
-    } else if (typeof(arg1) === 'object') {
-      // env config
-      var config = arg1;
-      callback = function(){
-        namespace.define("", config);
-      }
     }
 
     if (!callback) {
