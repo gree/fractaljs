@@ -1,8 +1,6 @@
 // Source: src/interface.js
 (function(global){
-  var ready = false;
-  var readyListeners = [];
-  var namespace = {};
+  var ready = false, readyListeners = [], namespace = {};
 
   var F = global.Fractal = global.F = function(arg1, arg2){
     var callback = null;
@@ -32,14 +30,14 @@
   F.init = function(callback) {
     if (readyListeners && readyListeners.length) {
       readyListeners.forEach(function(v){
-        v(F.__);
+        v(namespace);
       });
       readyListeners = [];
     }
     ready = true;
 
-    F.Component = F.__.Component;
-    F.Env = F.__.Env;
+    F.Component = namespace.Component;
+    F.Env = namespace.Env;
 
     callback();
   };
@@ -79,21 +77,17 @@ F(function(namespace){
 
   namespace.createAsyncCall = function(){
     var listeners = {};
-    var cache = {};
 
     var releaseListeners = function(key, result) {
-      //console.debug("asyncCall", key, "listeners", listeners[key].length);
-      listeners[key].forEach(function(v){
+      //console.debug("asyncCall", key, "releaselisteners", listeners[key].length);
+      var q = listeners[key];
+      delete listeners[key];
+      q.forEach(function(v){
         v(result);
       });
-      delete listeners[key];
     };
 
     return function(key, main, param, callback) {
-      if (key in cache) {
-        callback(cache[key]);
-        return;
-      }
       if (key in listeners) {
         listeners[key].push(callback);
         return;
@@ -105,19 +99,9 @@ F(function(namespace){
 
       listeners[key] = [callback];
 
-      main(key, param, function(result, multiple){
+      main(key, param, function(result){
         clearTimeout(timeout);
-        var cbRes;
-        if (multiple) {
-          for (var i in result) {
-            cache[i] = result[i];
-          }
-          cbRes = result[key];
-        } else {
-          cache[key] = result;
-          cbRes = result;
-        }
-        releaseListeners(key, cbRes);
+        releaseListeners(key, result);
       });
     }
   };
@@ -186,8 +170,7 @@ F(function(namespace){
 
 // Source: src/require.js
 F(function(namespace){
-  var TYPE = namespace.ClassType;
-  var createAsyncCall = namespace.createAsyncCall;
+  var TYPE = namespace.ClassType, createAsyncCall = namespace.createAsyncCall;
 
   var getResourceType = (function(){
     var KNOWN_TYPES = {js:1, css:1, tmpl:1};
@@ -198,10 +181,10 @@ F(function(namespace){
   })();
 
   (function(){
-    var data = null;
-    var dataOwner = null;
-    var refCount = 0;
-    var queue = [];
+    var data = null,
+    dataOwner = null,
+    refCount = 0,
+    queue = [];
 
     var release = function(name){
       if (name !== dataOwner) return false;
@@ -265,8 +248,8 @@ F(function(namespace){
     var byAddingElement = function(element, callback) {
       var done = false;
       element.onload = element.onreadystatechange = function(){
-        if ( !done && (!this.readyState ||
-                       this.readyState == "loaded" || this.readyState == "complete") ) {
+        var state = this.readyState;
+        if ( !done && (!state || state == "loaded" || state == "complete") ) {
           done = true;
           callback(false, true);
           element.onload = element.onreadystatechange = null;
@@ -281,11 +264,11 @@ F(function(namespace){
       xhr.open('GET', url, true);
       xhr.onreadystatechange = function(){
         if (xhr.readyState === 4) {
-          var err, data;
-          if ((xhr.status === 200 || xhr.status === 0) && xhr.responseText) {
-            callback(false, xhr.responseText);
+          var err, data, status = xhr.status, res = xhr.responseText;
+          if ((status === 200 || status === 0) && res) {
+            callback(false, res);
           } else {
-            callback("unexpected server resposne: " + xhr.status);
+            callback("unexpected server resposne: " + status);
           }
         }
       }
@@ -309,6 +292,7 @@ F(function(namespace){
     };
 
     var singleRequire = (function(){
+      var cache = {};
       var asyncCall = createAsyncCall();
 
       var main = function(url, param, callback) {
@@ -317,11 +301,15 @@ F(function(namespace){
           if (err) {
             console.error('Require error: ' + err);
           }
+          cache[url] = data;
           callback(data);
         });
       };
 
       return function(url, callback) {
+        if (url in cache) {
+          return callback(cache[url]);
+        }
         asyncCall(url, main, null, callback);
       };
     })();
@@ -364,34 +352,35 @@ F(function(namespace){
     return count;
   };
   proto.add = function(topic, data) {
-    if (this.count() >= MaxStocked && !(topic in this.buffer)) {
+    var self = this;
+    if (self.count() >= MaxStocked && !(topic in self.buffer)) {
       var oldest = new Data();
       var oldestTopic = "";
-      for (var i in this.arrived) {
-        if (this.arrived[i] < oldest) {
-          oldest = this.arrived[i];
+      for (var i in self.arrived) {
+        if (self.arrived[i] < oldest) {
+          oldest = self.arrived[i];
           oldestTopic = i;
         }
       }
-      delete this.buffer[oldestTopic];
-      delete this.arrived[oldestTopic];
+      delete self.buffer[oldestTopic];
+      delete self.arrived[oldestTopic];
     }
-    this.buffer[topic] = data;
-    this.arrived[topic] = new Date();
+    self.buffer[topic] = data;
+    self.arrived[topic] = new Date();
   };
   proto.get = function(topic) {
-    if (topic in this.buffer) {
-      var data = this.buffer[topic];
-      delete this.buffer[topic];
-      delete this.arrived[topic];
+    var self = this;
+    if (topic in self.buffer) {
+      var data = self.buffer[topic];
+      delete self.buffer[topic];
+      delete self.arrived[topic];
       return data;
     }
     return null;
   };
 
-  var topics = {};
-  var seq = 0;
-  var stock = new Stock();
+  var topics = {}, seq = 0, stock = new Stock();
+
   namespace.Pubsub = (function() {
     return {
       publish: function(topic, data, from) {
@@ -434,10 +423,10 @@ F(function(namespace){
 // Source: src/env.js
 F(function(namespace){
   // import
-  var isClass = namespace.isClass;
-  var ENV = namespace.ClassType.ENV;
-  var createAsyncCall = namespace.createAsyncCall;
-  var require = namespace.require;
+  var isClass = namespace.isClass,
+  ENV = namespace.ClassType.ENV,
+  createAsyncCall = namespace.createAsyncCall,
+  require = namespace.require;
 
   var EnvDescs = {};
 
@@ -445,15 +434,16 @@ F(function(namespace){
     return (protocol === "file:") ? "http:" : protocol;
   })(window.location.protocol);
 
-  namespace.Env = namespace.defineClass(ENV).extend({
+  var Env = namespace.Env = namespace.defineClass(ENV).extend({
+    PrefixComponent: "/",
+    PrefixTemplate: "/",
+    Envs: {},
+    Requires: [],
+
     DomParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
     TemplateEngine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
     compile: function(text) { return Hogan.compile(text) },
     render: function(template, data, options) { return template.render(data, options); },
-    prefixComponent: "/",
-    prefixTemplate: "/",
-    Envs: {},
-    Requires: [],
 
     init: function(name, url) {
       var self = this;
@@ -466,6 +456,7 @@ F(function(namespace){
         EnvDescs[i] = self.resolveUrl(self.Envs[i]);
       }
       self.asyncCall = createAsyncCall();
+      self.components = {};
     },
 
     resolveUrl: function(name) {
@@ -503,247 +494,91 @@ F(function(namespace){
       };
       return function(name, callback) {
         var self = this;
-        self.asyncCall(self.prefixTemplate + name + ".tmpl", main.bind(self), null, callback);
+        self.asyncCall(self.PrefixTemplate + name + ".tmpl", main.bind(self), null, callback);
       };
     })(),
     getComponentClass: (function(){
       var main = function(name, param, callback) {
         var self = this;
-        var url = self.resolveUrl(self.prefixComponent + name + ".js");
+        var url = self.resolveUrl(self.PrefixComponent + name + ".js");
         namespace.requireComponent(self.__name, url, function(components){
-          callback(components, true);
+          for (var i in components) {
+            self.components[i] = components[i];
+          }
+          callback(components[name]);
         });
       };
 
       return function(fullName, callback) {
         var self = this;
-        var envName, componentName;
+        var componentName;
+
         if (fullName.indexOf(":") >= 0) {
           var parts = fullName.split(":");
-          envName = parts[0] || self.__name;
           componentName = parts[1];
+          if (parts[0] !== self.__name) {
+            resolveEnv(parts[0], function(env){
+              env.getComponentClass(componentName, callback);
+            });
+            return;
+          }
         } else {
-          envName = self.__name;
           componentName = fullName;
         }
-        if (envName !== self.__name) {
-          resolveEnv(envName, function(env){
-            env.getComponentClass(componentName, callback);
-          });
-        } else {
-          self.asyncCall(componentName, main.bind(self), null, function(constructor){
-            callback(constructor, componentName, self);
-          });
+
+        var components = self.components;
+        if (componentName in components) {
+          return callback(components[componentName], componentName, self);
         }
+        self.asyncCall(componentName, main.bind(self), null, function(constructor){
+          callback(constructor, componentName, self);
+        });
       };
     })(),
   });
 
   var resolveEnv = (function(){
-    var asyncCall = createAsyncCall();
+    var cache = {}, asyncCall = createAsyncCall();
 
-    var createEnv = function(name, url, config, callback) {
-      var env = new Env(name, url, config);
-      env.init(function(){
+    var createEnv = function(constructor, name, url, callback) {
+      var env = new constructor(name, url);
+      env.setup(function(){
+        cache[name] = env;
         callback(env);
       });
     };
 
-    var main = function(url, envName, callback) {
+    var main = function(envName, param, callback) {
+      if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
+      var url = EnvDescs[envName];
       var ext = url.split(".").pop();
       if (ext !== "js") {
         if (url[url.length - 1] !== "/") url += "/";
-        var env = new namespace.Env(envName, url);
-        env.setup(function(){
-          callback(env);
-        });
+        createEnv(Env, envName, url, callback);
       } else {
         namespace.requireEnv(url, function(constructors){
           var constructor = constructors[envName];
-          var env = new constructor(envName, url);
-          env.setup(function(){
-            callback(env);
-          });
+          createEnv(constructor, envName, url, callback);
         });
       }
     };
 
     return function(envName, callback) {
-      if (!envName) return callback(defaultEnv);
-      if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
-      var url = EnvDescs[envName];
-      asyncCall(url, main, envName, callback);
+      if (envName in cache) {
+        return callback(cache[envName]);
+      }
+      asyncCall(envName, main, null, callback);
     };
   })();
-
-
-  // var Env = (function(){
-  //   var protocol = global.location.protocol == "file:" ? "http:" : global.location.protocol;
-  //   var defaultConfig = {
-  //     DomParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
-  //     Template: {
-  //       Engine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
-  //       Compile: function(text) { return Hogan.compile(text) },
-  //       Render: function(template, data, options) { return template.render(data, options); },
-  //     },
-  //     Prefix: {
-  //       Component: "/",
-  //       Template: "/",
-  //     },
-  //     Envs: {},
-  //     Requires: [],
-  //   };
-
-  //   var Env = function(name, descUrl, config){
-  //     this.__name = name;
-  //     this.descUrl = descUrl;
-  //     config = config || {};
-
-  //     this.SourceRoot = config.SourceRoot || (function(url){
-  //       return url.split("/").slice(0, -1).join("/") + "/";
-  //     })(descUrl || global.location.pathname);
-
-  //     this.components = {};
-  //     for (var i in defaultConfig) {
-  //       this[i] = config[i] || defaultConfig[i];
-  //     }
-  //     var self = this;
-  //     ["Template", "Prefix"].forEach(function(v){
-  //       for (var i in defaultConfig[v]) {
-  //         self[v][i] = self[v][i] || defaultConfig[v][i];
-  //       }
-  //     });
-  //     self.asyncCall = createAsyncCall();
-  //   };
-
-  //   var proto = Env.prototype;
-  //   proto.resolveUrl = function(name) {
-  //     if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
-  //     return this.SourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
-  //   };
-  //   proto.getName = function() { return this.__name; };
-  //   proto.init = function(callback) {
-  //     var self = this;
-  //     for (var i in self.Envs) {
-  //       EnvDescs[i] = self.resolveUrl(self.Envs[i]);
-  //     }
-  //     self.require([self.DomParser, self.Template.Engine], function(){
-  //       $.event.special.destroyed = {
-  //         remove: function(o) {
-  //           if (o.handler) o.handler();
-  //         }
-  //       };
-  //       self.require(self.Requires, function(){
-  //         callback();
-  //       });
-  //     });
-  //   };
-
-  //   proto.require = function(names, callback){
-  //     var self = this;
-  //     if (!Array.isArray(names)) {
-  //       require(self.resolveUrl(names), callback);
-  //     } else {
-  //       require(names.map(function(v){ return self.resolveUrl(v); }), callback);
-  //     }
-  //   };
-
-  //   proto.getTemplate = function(names, callback) {
-  //     self.require(names, function(data){
-  //       if (typeof(names === "string")) callback(self.compile(data));
-  //       else {
-  //         for (var i in data) {
-  //           data[i] = self.compile(data[i]);
-  //         }
-  //         callback(data);
-  //       }
-  //     });
-  //   };
-
-  //   proto.getComponentClass = (function(){
-  //     var main = function(name, env, callback) {
-  //       var url = env.resolveUrl(env.Prefix.Component + name + ".js");
-  //       namespace.requireComponents(env.getName(), url, function(components){
-  //         callback(components, true);
-  //       });
-  //     };
-
-  //     return function(fullName, callback) {
-  //       var self = this;
-  //       var envName, componentName;
-  //       if (fullName.indexOf(":") >= 0) {
-  //         var parts = fullName.split(":");
-  //         envName = parts[0] || self.getName();
-  //         componentName = parts[1];
-  //       } else {
-  //         envName = self.getName();
-  //         componentName = fullName;
-  //       }
-  //       if (envName !== self.getName()) {
-  //         resolveEnv(envName, function(env){
-  //           env.getComponentClass(componentName, callback);
-  //         });
-  //       } else {
-  //         self.asyncCall(componentName, main, self, function(constructor){
-  //           callback(constructor, componentName, self);
-  //         });
-  //       }
-  //     };
-  //   })();
-
-  //   return Env;
-  // })();
-
-  // var resolveEnv = (function(){
-  //   var asyncCall = createAsyncCall();
-
-  //   var createEnv = function(name, url, config, callback) {
-  //     var env = new Env(name, url, config);
-  //     env.init(function(){
-  //       callback(env);
-  //     });
-  //   };
-
-  //   var main = function(url, envName, callback) {
-  //     var ext = url.split(".").pop();
-  //     if (ext !== "js") {
-  //       if (url[url.length - 1] !== "/") url += "/";
-  //       createEnv(envName, url, null, callback);
-  //     } else {
-  //       namespace.requireConfig(url, function(configs){
-  //         var config = configs[envName];
-  //         createEnv(envName, url, config, callback);
-  //       });
-  //     }
-  //   };
-
-  //   return function(envName, callback) {
-  //     if (!envName) return callback(defaultEnv);
-  //     if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
-  //     var url = EnvDescs[envName];
-  //     asyncCall(url, main, envName, callback);
-  //   }
-  // })();
-
-  // var defaultEnv = null;
-  // namespace.createDefaultEnv = function(config, cb){
-  //   if (defaultEnv) return cb(defaultEnv);
-  //   var env = new Env("", "", config);
-  //   env.init(function(){
-  //     defaultEnv = env;
-  //     cb(env);
-  //   });
-  // };
-
 });
 
 
 // Source: src/component.js
 F(function(namespace){
   // import
-  var isClass = namespace.isClass;
-  var pubsub = namespace.Pubsub;
-  var COMPONENT = namespace.ClassType.COMPONENT;
+  var isClass = namespace.isClass,
+  pubsub = namespace.Pubsub,
+  COMPONENT = namespace.ClassType.COMPONENT;
 
   var ComponentFilter = "[data-role=component]";
   var __defaultLoadHandler = function(callback, param) { callback(); };
@@ -788,10 +623,11 @@ F(function(namespace){
       }
     },
     call: function(methodName, data) {
+      var self = this;
       if (methodName.indexOf(":") < 0) {
-        methodName = this.F.getName() + ":" + methodName;
+        methodName = self.F.getName() + ":" + methodName;
       }
-      this.publish(methodName, data, this);
+      self.publish(methodName, data, self);
     },
     load: function(param, callback){
       var self = this;
@@ -841,8 +677,9 @@ F(function(namespace){
     },
     afterRender: __defaultLoadHandler,
     myselfLoaded: function(callback, param){
-      while (this.earlyRecieved.length > 0) {
-        this.earlyRecieved.pop()();
+      var earlyRecieved = this.earlyRecieved;
+      while (earlyRecieved.length > 0) {
+        earlyRecieved.pop()();
       }
       callback();
     },
@@ -884,10 +721,11 @@ F(function(namespace){
       });
     },
     unsubscribe: function(topic) {
+      var list = this.subscribeList;
       if (!topic) {
-        for (var i in this.subscribeList) pubsub.unsubscribe(i, this.subscribeList[i]);
+        for (var i in list) pubsub.unsubscribe(i, list[i]);
       } else {
-        if (topic in this.subscribeList) pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in list) pubsub.unsubscribe(topic, list[topic]);
       }
     },
   });

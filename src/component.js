@@ -1,8 +1,8 @@
 F(function(namespace){
   // import
-  var isClass = namespace.isClass;
-  var pubsub = namespace.Pubsub;
-  var COMPONENT = namespace.ClassType.COMPONENT;
+  var isClass = namespace.isClass,
+  pubsub = namespace.Pubsub,
+  COMPONENT = namespace.ClassType.COMPONENT;
 
   var ComponentFilter = "[data-role=component]";
   var __defaultLoadHandler = function(callback, param) { callback(); };
@@ -47,10 +47,11 @@ F(function(namespace){
       }
     },
     call: function(methodName, data) {
+      var self = this;
       if (methodName.indexOf(":") < 0) {
-        methodName = this.F.getName() + ":" + methodName;
+        methodName = self.F.getName() + ":" + methodName;
       }
-      this.publish(methodName, data, this);
+      self.publish(methodName, data, self);
     },
     load: function(param, callback){
       var self = this;
@@ -101,8 +102,9 @@ F(function(namespace){
     },
     afterRender: __defaultLoadHandler,
     myselfLoaded: function(callback, param){
-      while (this.earlyRecieved.length > 0) {
-        this.earlyRecieved.pop()();
+      var earlyRecieved = this.earlyRecieved;
+      while (earlyRecieved.length > 0) {
+        earlyRecieved.pop()();
       }
       callback();
     },
@@ -144,10 +146,11 @@ F(function(namespace){
       });
     },
     unsubscribe: function(topic) {
+      var list = this.subscribeList;
       if (!topic) {
-        for (var i in this.subscribeList) pubsub.unsubscribe(i, this.subscribeList[i]);
+        for (var i in list) pubsub.unsubscribe(i, list[i]);
       } else {
-        if (topic in this.subscribeList) pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in list) pubsub.unsubscribe(topic, list[topic]);
       }
     },
   });

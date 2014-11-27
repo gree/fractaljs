@@ -12,34 +12,35 @@ F(function(namespace){
     return count;
   };
   proto.add = function(topic, data) {
-    if (this.count() >= MaxStocked && !(topic in this.buffer)) {
+    var self = this;
+    if (self.count() >= MaxStocked && !(topic in self.buffer)) {
       var oldest = new Data();
       var oldestTopic = "";
-      for (var i in this.arrived) {
-        if (this.arrived[i] < oldest) {
-          oldest = this.arrived[i];
+      for (var i in self.arrived) {
+        if (self.arrived[i] < oldest) {
+          oldest = self.arrived[i];
           oldestTopic = i;
         }
       }
-      delete this.buffer[oldestTopic];
-      delete this.arrived[oldestTopic];
+      delete self.buffer[oldestTopic];
+      delete self.arrived[oldestTopic];
     }
-    this.buffer[topic] = data;
-    this.arrived[topic] = new Date();
+    self.buffer[topic] = data;
+    self.arrived[topic] = new Date();
   };
   proto.get = function(topic) {
-    if (topic in this.buffer) {
-      var data = this.buffer[topic];
-      delete this.buffer[topic];
-      delete this.arrived[topic];
+    var self = this;
+    if (topic in self.buffer) {
+      var data = self.buffer[topic];
+      delete self.buffer[topic];
+      delete self.arrived[topic];
       return data;
     }
     return null;
   };
 
-  var topics = {};
-  var seq = 0;
-  var stock = new Stock();
+  var topics = {}, seq = 0, stock = new Stock();
+
   namespace.Pubsub = (function() {
     return {
       publish: function(topic, data, from) {

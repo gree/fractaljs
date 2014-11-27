@@ -1,7 +1,5 @@
 (function(global){
-  var ready = false;
-  var readyListeners = [];
-  var namespace = {};
+  var ready = false, readyListeners = [], namespace = {};
 
   var F = global.Fractal = global.F = function(arg1, arg2){
     var callback = null;
@@ -31,14 +29,14 @@
   F.init = function(callback) {
     if (readyListeners && readyListeners.length) {
       readyListeners.forEach(function(v){
-        v(F.__);
+        v(namespace);
       });
       readyListeners = [];
     }
     ready = true;
 
-    F.Component = F.__.Component;
-    F.Env = F.__.Env;
+    F.Component = namespace.Component;
+    F.Env = namespace.Env;
 
     callback();
   };

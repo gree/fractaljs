@@ -12,21 +12,17 @@ F(function(namespace){
 
   namespace.createAsyncCall = function(){
     var listeners = {};
-    var cache = {};
 
     var releaseListeners = function(key, result) {
-      //console.debug("asyncCall", key, "listeners", listeners[key].length);
-      listeners[key].forEach(function(v){
+      //console.debug("asyncCall", key, "releaselisteners", listeners[key].length);
+      var q = listeners[key];
+      delete listeners[key];
+      q.forEach(function(v){
         v(result);
       });
-      delete listeners[key];
     };
 
     return function(key, main, param, callback) {
-      if (key in cache) {
-        callback(cache[key]);
-        return;
-      }
       if (key in listeners) {
         listeners[key].push(callback);
         return;
@@ -38,19 +34,9 @@ F(function(namespace){
 
       listeners[key] = [callback];
 
-      main(key, param, function(result, multiple){
+      main(key, param, function(result){
         clearTimeout(timeout);
-        var cbRes;
-        if (multiple) {
-          for (var i in result) {
-            cache[i] = result[i];
-          }
-          cbRes = result[key];
-        } else {
-          cache[key] = result;
-          cbRes = result;
-        }
-        releaseListeners(key, cbRes);
+        releaseListeners(key, result);
       });
     }
   };

@@ -1,9 +1,9 @@
 F(function(namespace){
   // import
-  var isClass = namespace.isClass;
-  var ENV = namespace.ClassType.ENV;
-  var createAsyncCall = namespace.createAsyncCall;
-  var require = namespace.require;
+  var isClass = namespace.isClass,
+  ENV = namespace.ClassType.ENV,
+  createAsyncCall = namespace.createAsyncCall,
+  require = namespace.require;
 
   var EnvDescs = {};
 
@@ -11,7 +11,7 @@ F(function(namespace){
     return (protocol === "file:") ? "http:" : protocol;
   })(window.location.protocol);
 
-  namespace.Env = namespace.defineClass(ENV).extend({
+  var Env = namespace.Env = namespace.defineClass(ENV).extend({
     PrefixComponent: "/",
     PrefixTemplate: "/",
     Envs: {},
@@ -33,6 +33,7 @@ F(function(namespace){
         EnvDescs[i] = self.resolveUrl(self.Envs[i]);
       }
       self.asyncCall = createAsyncCall();
+      self.components = {};
     },
 
     resolveUrl: function(name) {
@@ -78,68 +79,72 @@ F(function(namespace){
         var self = this;
         var url = self.resolveUrl(self.PrefixComponent + name + ".js");
         namespace.requireComponent(self.__name, url, function(components){
-          callback(components, true);
+          for (var i in components) {
+            self.components[i] = components[i];
+          }
+          callback(components[name]);
         });
       };
 
       return function(fullName, callback) {
         var self = this;
-        var envName, componentName;
+        var componentName;
+
         if (fullName.indexOf(":") >= 0) {
           var parts = fullName.split(":");
-          envName = parts[0] || self.__name;
           componentName = parts[1];
+          if (parts[0] !== self.__name) {
+            resolveEnv(parts[0], function(env){
+              env.getComponentClass(componentName, callback);
+            });
+            return;
+          }
         } else {
-          envName = self.__name;
           componentName = fullName;
         }
-        if (envName !== self.__name) {
-          resolveEnv(envName, function(env){
-            env.getComponentClass(componentName, callback);
-          });
-        } else {
-          self.asyncCall(componentName, main.bind(self), null, function(constructor){
-            callback(constructor, componentName, self);
-          });
+
+        var components = self.components;
+        if (componentName in components) {
+          return callback(components[componentName], componentName, self);
         }
+        self.asyncCall(componentName, main.bind(self), null, function(constructor){
+          callback(constructor, componentName, self);
+        });
       };
     })(),
   });
 
   var resolveEnv = (function(){
-    var asyncCall = createAsyncCall();
+    var cache = {}, asyncCall = createAsyncCall();
 
-    var createEnv = function(name, url, config, callback) {
-      var env = new Env(name, url, config);
-      env.init(function(){
+    var createEnv = function(constructor, name, url, callback) {
+      var env = new constructor(name, url);
+      env.setup(function(){
+        cache[name] = env;
         callback(env);
       });
     };
 
-    var main = function(url, envName, callback) {
+    var main = function(envName, param, callback) {
+      if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
+      var url = EnvDescs[envName];
       var ext = url.split(".").pop();
       if (ext !== "js") {
         if (url[url.length - 1] !== "/") url += "/";
-        var env = new namespace.Env(envName, url);
-        env.setup(function(){
-          callback(env);
-        });
+        createEnv(Env, envName, url, callback);
       } else {
         namespace.requireEnv(url, function(constructors){
           var constructor = constructors[envName];
-          var env = new constructor(envName, url);
-          env.setup(function(){
-            callback(env);
-          });
+          createEnv(constructor, envName, url, callback);
         });
       }
     };
 
     return function(envName, callback) {
-      if (!envName) return callback(defaultEnv);
-      if (!(envName in EnvDescs)) throw new Error("unknown env name: " + envName);
-      var url = EnvDescs[envName];
-      asyncCall(url, main, envName, callback);
+      if (envName in cache) {
+        return callback(cache[envName]);
+      }
+      asyncCall(envName, main, null, callback);
     };
   })();
 });

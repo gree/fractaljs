@@ -1,6 +1,5 @@
 F(function(namespace){
-  var TYPE = namespace.ClassType;
-  var createAsyncCall = namespace.createAsyncCall;
+  var TYPE = namespace.ClassType, createAsyncCall = namespace.createAsyncCall;
 
   var getResourceType = (function(){
     var KNOWN_TYPES = {js:1, css:1, tmpl:1};
@@ -11,10 +10,10 @@ F(function(namespace){
   })();
 
   (function(){
-    var data = null;
-    var dataOwner = null;
-    var refCount = 0;
-    var queue = [];
+    var data = null,
+    dataOwner = null,
+    refCount = 0,
+    queue = [];
 
     var release = function(name){
       if (name !== dataOwner) return false;
@@ -82,8 +81,8 @@ F(function(namespace){
     var byAddingElement = function(element, callback) {
       var done = false;
       element.onload = element.onreadystatechange = function(){
-        if ( !done && (!this.readyState ||
-                       this.readyState == "loaded" || this.readyState == "complete") ) {
+        var state = this.readyState;
+        if ( !done && (!state || state == "loaded" || state == "complete") ) {
           done = true;
           callback(false, true);
           element.onload = element.onreadystatechange = null;
@@ -98,11 +97,11 @@ F(function(namespace){
       xhr.open('GET', url, true);
       xhr.onreadystatechange = function(){
         if (xhr.readyState === 4) {
-          var err, data;
-          if ((xhr.status === 200 || xhr.status === 0) && xhr.responseText) {
-            callback(false, xhr.responseText);
+          var err, data, status = xhr.status, res = xhr.responseText;
+          if ((status === 200 || status === 0) && res) {
+            callback(false, res);
           } else {
-            callback("unexpected server resposne: " + xhr.status);
+            callback("unexpected server resposne: " + status);
           }
         }
       }
@@ -126,6 +125,7 @@ F(function(namespace){
     };
 
     var singleRequire = (function(){
+      var cache = {};
       var asyncCall = createAsyncCall();
 
       var main = function(url, param, callback) {
@@ -135,11 +135,15 @@ F(function(namespace){
           if (err) {
             console.error('Require error: ' + err);
           }
+          cache[url] = data;
           callback(data);
         });
       };
 
       return function(url, callback) {
+        if (url in cache) {
+          return callback(cache[url]);
+        }
         asyncCall(url, main, null, callback);
       };
     })();
