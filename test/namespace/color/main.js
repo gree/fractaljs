@@ -11,13 +11,13 @@ F('color', F.Component.extend({
 }));
 
 F('red', function(env, cb){
-  env.getComponentClass('color', function(base){
+  env.requireComponent('color', function(base){
     cb(base.extend({}));
   });
 });
 
 F('blue', function(env, cb){
-  env.getComponentClass('color', function(base){
+  env.requireComponent('color', function(base){
     cb(base.extend({}));
   });
 });

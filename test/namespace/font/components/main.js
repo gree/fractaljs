@@ -11,13 +11,13 @@ F('font', F.Component.extend({
 }));
 
 F('Georgia', function(env, cb){
-  env.getComponentClass('font', function(base){
+  env.requireComponent('font', function(base){
     cb(base.extend({}));
   });
 });
 
 F('Arial', function(env, cb){
-  env.getComponentClass('font', function(base){
+  env.requireComponent('font', function(base){
     cb(base.extend({}));
   });
 });

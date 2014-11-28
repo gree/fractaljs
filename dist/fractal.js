@@ -1,4 +1,3 @@
-// Source: src/__head__.js
 (function(global){
 
 
@@ -522,7 +521,7 @@ F.Env = (function(){
         );
       };
     })(),
-    getComponentClass: (function(){
+    requireComponent: (function(){
       var main = function(name, param, callback) {
         var self = this;
         var url = self.resolveUrl(self.PrefixComponent + name + ".js");
@@ -543,7 +542,7 @@ F.Env = (function(){
           componentName = parts[1];
           if (parts[0] !== self.name) {
             resolveEnv(parts[0], function(env){
-              env.getComponentClass(componentName, callback);
+              env.requireComponent(componentName, callback);
             });
             return;
           }
@@ -602,7 +601,8 @@ F.Component = (function(){
       // self.children = [];
       // self.parent = null;
       self.templateName = self.templateName || self.name;
-      if (typeof(self.template) === "string") self.template = self.F.compile(self.template);
+      if (typeof(self.template) === "string")
+        self.template = self.F.compile(self.template);
 
       var publicMethods = self.Public || {};
       for (var i in publicMethods) {
@@ -676,20 +676,20 @@ F.Component = (function(){
     },
     loadChildren: function(callback, param){
       var self = this;
-      var components = self.$("[" + COMPONENT_ATTR + "]");
-      var len = components.length;
+      var els = self.$("[" + COMPONENT_ATTR + "]");
+      var len = els.length;
       if (!len) {
         if (callback) callback();
         return;
       }
 
-      forEachAsync(components, function(container, cb){
+      forEachAsync(els, function(container, cb){
         var $container = $(container);
         var fullName = $container.attr(COMPONENT_ATTR);
-        self.F.getComponentClass(fullName, function(constructor, componentName, env){
+        self.F.requireComponent(fullName, function(constructor, componentName, env){
           getConstructor(constructor, env, function(constructor){
             if (!isClass(constructor, COMPONENT)) {
-              throw new Error("unexpected component class: " + env.name + ":" + componentName);
+              throw new Error("not component class: " + env.name + ":" + componentName);
             }
             var c = new constructor(componentName, $container, env);
             c.load(param, cb);
@@ -704,13 +704,17 @@ F.Component = (function(){
       this.unsubscribe();
     },
 
-    require: function(name, options, callback) { this.F.require(name, options, callback); },
-    publish: function(topic, data) { pubsub.publish(topic, data, this); },
+    publish: function(topic, data) {
+      pubsub.publish(topic, data, this);
+    },
     subscribe: function(topic, callback){
       var self = this;
       self.subscribeList[topic] = pubsub.subscribe(topic, function(topic, data, from){
-        if (self.rendered) callback(topic, data, from);
-        else self.earlyRecieved.push(function(){ callback(topic, data, from); });
+        if (self.rendered) {
+          callback(topic, data, from);
+        } else {
+          self.earlyRecieved.push(function(){ callback(topic, data, from); });
+        }
       });
     },
     unsubscribe: function(topic) {
@@ -726,5 +730,4 @@ F.Component = (function(){
 })();
 
 
-// Source: src/__foot__.js
 })(window);

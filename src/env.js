@@ -118,7 +118,7 @@ F.Env = (function(){
         );
       };
     })(),
-    getComponentClass: (function(){
+    requireComponent: (function(){
       var main = function(name, param, callback) {
         var self = this;
         var url = self.resolveUrl(self.PrefixComponent + name + ".js");
@@ -139,7 +139,7 @@ F.Env = (function(){
           componentName = parts[1];
           if (parts[0] !== self.name) {
             resolveEnv(parts[0], function(env){
-              env.getComponentClass(componentName, callback);
+              env.requireComponent(componentName, callback);
             });
             return;
           }
