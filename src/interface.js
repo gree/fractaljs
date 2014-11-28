@@ -1,45 +1,33 @@
-(function(global){
-  var ready = false, readyListeners = [], namespace = {};
+(function(global){ // dev
 
-  var F = global.Fractal = global.F = function(arg1, arg2){
+  var namespace = {}; // dev
+  var ready = false, listeners = [];
+
+  var F = global.F = function(arg1, arg2){
+    var ObjectLoader = namespace.ObjectLoader; // dev
+    var isClass = namespace.isClass; // dev
+
     var callback = null;
-
-    if (typeof(arg1) === 'function') {
+    if (typeof(arg1) === "function") {
       // 'onready' event handler
       callback = arg1;
-    } else if (typeof(arg1) === 'string' && arg2) {
+    } else if (typeof(arg1) === "string" && arg2) {
       // define an object
       var name = arg1, object = arg2;
       callback = function(){
-        namespace.define(name, object);
+        ObjectLoader.define(name, object);
       };
-    }
-
-    if (!callback) {
+    } else {
       return;
     }
     if (ready) {
-      return callback();
+      callback();
+    } else {
+      listeners.push(callback);
     }
-    readyListeners.push(callback);
   };
 
-  F.__ = namespace;
-
-  F.init = function(callback) {
-    if (readyListeners && readyListeners.length) {
-      readyListeners.forEach(function(v){
-        v(namespace);
-      });
-      readyListeners = [];
-    }
-    ready = true;
-
-    F.Component = namespace.Component;
-    F.Env = namespace.Env;
-
-    callback();
-  };
+  F.__ = namespace; // dev
 
   F.construct = function(env, callback){
     console.time("F.construct");
@@ -47,8 +35,15 @@
       callback = env;
       env = null;
     }
-    if (!env) env = new namespace.Env();
+    if (!env) env = new F.Env("");
     env.setup(function(){
+      ready = true;
+      var i = 0, len = listeners.length;
+      for (; i < len; ++i) {
+        listeners[i]();
+      }
+      listeners = [];
+
       var c = new F.Component("", $(global.document), env);
       c.loadChildren(function(){
         console.timeEnd("F.construct");
@@ -59,5 +54,5 @@
     });
   };
 
-})(window);
+})(window); // dev
 

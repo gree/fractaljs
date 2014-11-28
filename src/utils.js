@@ -1,5 +1,6 @@
-F(function(namespace){
-  namespace.forEachAsync = function(items, asyncCall, done) {
+(function(namespace){ // dev
+
+  var forEachAsync = function(items, asyncCall, done) {
     var len = items.length;
     if (!len) return done();
     var i = 0, complete = 0;
@@ -10,7 +11,7 @@ F(function(namespace){
     }
   };
 
-  namespace.createAsyncCall = function(){
+  var createAsyncCall = function(){
     var listeners = {};
 
     var releaseListeners = function(key, result) {
@@ -41,7 +42,7 @@ F(function(namespace){
     }
   };
 
-  namespace.defineClass = function(type){
+  var defineClass = function(type){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
      * MIT Licensed.
@@ -89,16 +90,22 @@ F(function(namespace){
     return Class;
   };
 
-  namespace.isClass = function(object, type) {
+  var isClass = function(object, type) {
     if (!object.getType) return false;
     if (!type) return true
     return object.getType() === type;
   };
 
-  namespace.ClassType = {
+  var ClassType = {
     COMPONENT: 1,
     ENV: 2
   };
 
-});
+  namespace.forEachAsync = forEachAsync; // dev
+  namespace.createAsyncCall = createAsyncCall; // dev
+  namespace.defineClass = defineClass; // dev
+  namespace.isClass = isClass; // dev
+  namespace.ClassType = ClassType; // dev
+
+})(F.__); // dev
 

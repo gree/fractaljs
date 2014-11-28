@@ -4,7 +4,7 @@
     <title>FractalJS App</title>
   </head>
   <body>
-    <div data-role="component" data-name="main"></div>
+    <div f-component="main"></div>
 
     <script type="text/javascript" src="../src/interface.js"></script>
     <script type="text/javascript" src="../src/utils.js"></script>
@@ -14,17 +14,16 @@
     <script type="text/javascript" src="../src/component.js"></script>
     <script type="text/javascript" src="../src/app.js"></script>
     <script type="text/javascript">
-      F.init(function(){
-        var env = new (F.Env.extend({
-          Envs: {
-            namespace: "namespace/config.js",
-            recursive: "recursive/",
-            list: "list/",
-            require: "require/config.js",
-          },
-        }))("local");
-        F.construct(env);
-      });
+      var env = new (F.Env.extend({
+        Envs: {
+          namespace: "namespace/config.js",
+          recursive: "recursive/",
+          list: "list/",
+          require: "require/config.js",
+          history: "history/",
+        },
+      }))("local");
+      F.construct(env);
     </script>
   </body>
 </html>

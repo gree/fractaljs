@@ -4,22 +4,21 @@
     <title>FractalJS App</title>
   </head>
   <body>
-    <div data-role="component" data-name="main"></div>
+    <div f-component="main"></div>
 
-    <script type="text/javascript" src="../dist/fractal.min.js"></script>
+    <script type="text/javascript" src="../dist/fractal.js"></script>
     <script type="text/javascript" src="../dist/fractal.app.js"></script>
     <script type="text/javascript">
-      F.init(function(){
-        var env = new (F.Env.extend({
-          Envs: {
-            namespace: "namespace/config.js",
-            recursive: "recursive/",
-            list: "list/",
-            require: "require/config.js",
-          },
-        }))("local");
-        F.construct(env);
-      });
+      var env = new (F.Env.extend({
+        Envs: {
+          namespace: "namespace/config.js",
+          recursive: "recursive/",
+          list: "list/",
+          require: "require/config.js",
+          history: "history/",
+        },
+      }))("local");
+      F.construct(env);
     </script>
   </body>
 </html>

@@ -4,7 +4,7 @@ F('color', F.Component.extend({
   template: '<span style="color:{{name}}">{{envName}}:{{name}}</span>',
   getData: function(cb, param){
     cb({
-      envName: this.F.getName(),
+      envName: this.F.name,
       name: this.name
     });
   }

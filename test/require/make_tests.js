@@ -17,7 +17,7 @@ var getConfig = function(name){
 }
 
 var getContainer = function(envName, name) {
-  return '<div data-role="component" data-name="' + envName + ':' + name + '"></div>\n';
+  return '<div f-component="' + envName + ':' + name + '"></div>\n';
 };
 
 var prefix = "__generated__/";

@@ -4,7 +4,7 @@ F('font', F.Component.extend({
   template: '<span style="font-family:{{name}}">{{envName}}:{{name}}</span>',
   getData: function(cb, param){
     cb({
-      envName: this.F.getName(),
+      envName: this.F.name,
       name: this.name
     });
   }

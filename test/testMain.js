@@ -6,6 +6,7 @@ F("testMain", F.Component.extend({
         "recursive",
         "namespace",
         "require",
+        "history",
       ]
     });
   },

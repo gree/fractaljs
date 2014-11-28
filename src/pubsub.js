@@ -1,4 +1,4 @@
-F(function(namespace){
+F.Pubsub = (function(){
   // TODO replace with faster algorithm, data structure
   var MaxStocked = 100;
   var Stock = function(){
@@ -41,45 +41,44 @@ F(function(namespace){
 
   var topics = {}, seq = 0, stock = new Stock();
 
-  namespace.Pubsub = (function() {
-    return {
-      publish: function(topic, data, from) {
-        if (!topics[topic]) {
-          console.debug("stock message", topic, from.name, data);
-          stock.add(topic, {d: data, f: from});
-          return;
+  return {
+    publish: function(topic, data, from) {
+      if (!topics[topic]) {
+        console.debug("stock message", topic, (from && from.name), data);
+        stock.add(topic, {d: data, f: from});
+        return;
+      }
+      var subscribers = topics[topic];
+      for (var i in subscribers) subscribers[i].cb(topic, data, from);
+    },
+    subscribe: function(topic, callback) {
+      console.debug("subscribe", topic);
+      if (!topics[topic]) topics[topic] = [];
+      var token = ++seq;
+      topics[topic].push({
+        token: token,
+        cb: callback
+      });
+      var data = stock.get(topic);
+      if (data) {
+        console.debug("get from stock", topic, data.f, data.d);
+        callback(topic, data.d, data.f);
+      }
+      return token;
+    },
+    unsubscribe: function(topic, token) {
+      console.debug("unsubscribe", topic);
+      if (!(topic in topics)) return;
+      var subscribers = topics[topic];
+      for (var i in subscribers) {
+        if (subscribers[i].token === token) {
+          subscribers.splice(i, 1);
+          break;
         }
-        var subscribers = topics[topic];
-        for (var i in subscribers) subscribers[i].cb(topic, data, from);
-      },
-      subscribe: function(topic, callback) {
-        console.debug("subscribe", topic);
-        if (!topics[topic]) topics[topic] = [];
-        var token = ++seq;
-        topics[topic].push({
-          token: token,
-          cb: callback
-        });
-        var data = stock.get(topic);
-        if (data) {
-          console.debug("get from stock", topic, data.f, data.d);
-          callback(topic, data.d, data.f);
-        }
-        return token;
-      },
-      unsubscribe: function(topic, token) {
-        console.debug("unsubscribe", topic);
-        if (!(topic in topics)) return;
-        var subscribers = topics[topic];
-        for (var i in subscribers) {
-          if (subscribers[i].token === token) {
-            subscribers.splice(i, 1);
-            break;
-          }
-        }
-        if (subscribers.length === 0) delete topics[topic];
-      },
-    };
-  }());
-});
+      }
+      if (subscribers.length === 0) delete topics[topic];
+    },
+  };
+
+})();
 

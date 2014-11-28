@@ -1,30 +1,34 @@
-F(function(namespace){
+F.Component = (function(){
   // import
-  var isClass = namespace.isClass,
-  pubsub = namespace.Pubsub,
-  COMPONENT = namespace.ClassType.COMPONENT;
+  var namespace = F.__; // dev
+  var isClass = namespace.isClass; // dev
+  var ClassType = namespace.ClassType; // dev
+  var defineClass = namespace.defineClass; // dev
+  var forEachAsync = namespace.forEachAsync; // dev
 
-  var ComponentFilter = "[data-role=component]";
-  var __defaultLoadHandler = function(callback, param) { callback(); };
+  var pubsub = F.Pubsub,
+  COMPONENT = ClassType.COMPONENT,
+  COMPONENT_ATTR = "f-component",
+  __defaultLoadHandler = function(callback, param) { callback(); };
 
   var getConstructor = function(constructor, env, callback) {
-    if (isClass(constructor, COMPONENT)) {
+    if (isClass(constructor, ClassType.COMPONENT)) {
       callback(constructor);
     } else {
       constructor(env, callback);
     }
   };
 
-  namespace.Component = namespace.defineClass(COMPONENT).extend({
+  return defineClass(ClassType.COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;
       self.$container = $container;
       self.F = env;
-      self.fullName = self.F.getName() + ":" + name;
+      self.fullName = self.F.name + ":" + name;
 
       self.$ = self.$container.find.bind(self.$container);
-      var resetDisplay = self.$container.data("display");
+      var resetDisplay = self.$container.attr("f-display");
       if (resetDisplay) self.$container.css("display", resetDisplay);
       self.$container.on("destroyed", self.unload.bind(self));
 
@@ -49,7 +53,7 @@ F(function(namespace){
     call: function(methodName, data) {
       var self = this;
       if (methodName.indexOf(":") < 0) {
-        methodName = self.F.getName() + ":" + methodName;
+        methodName = self.F.name + ":" + methodName;
       }
       self.publish(methodName, data, self);
     },
@@ -110,20 +114,20 @@ F(function(namespace){
     },
     loadChildren: function(callback, param){
       var self = this;
-      var components = self.$(ComponentFilter);
+      var components = self.$("[" + COMPONENT_ATTR + "]");
       var len = components.length;
       if (!len) {
         if (callback) callback();
         return;
       }
 
-      namespace.forEachAsync(components, function(container, cb){
+      forEachAsync(components, function(container, cb){
         var $container = $(container);
-        var fullName = $container.data("name");
+        var fullName = $container.attr(COMPONENT_ATTR);
         self.F.getComponentClass(fullName, function(constructor, componentName, env){
           getConstructor(constructor, env, function(constructor){
             if (!isClass(constructor, COMPONENT)) {
-              throw new Error("unexpected component class: " + env.getName() + ":" + componentName);
+              throw new Error("unexpected component class: " + env.name + ":" + componentName);
             }
             var c = new constructor(componentName, $container, env);
             c.load(param, cb);
@@ -134,7 +138,10 @@ F(function(namespace){
       })
     },
     allLoaded: __defaultLoadHandler,
-    unload: function(){ this.unsubscribe(); },
+    unload: function(){
+      console.debug("unload called", this.fullName);
+      this.unsubscribe();
+    },
 
     require: function(name, options, callback) { this.F.require(name, options, callback); },
     publish: function(topic, data) { pubsub.publish(topic, data, this); },
@@ -154,5 +161,6 @@ F(function(namespace){
       }
     },
   });
-});
+
+})();
 

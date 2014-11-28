@@ -1,5 +1,5 @@
 // Source: src/app.js
-F(function(namespace){
+F(function(){
   var app = F.app = {};
   var PageKey = "page";
 
@@ -32,22 +32,12 @@ F(function(namespace){
     }).join("&");
   };
 
-  app.navigate = function(page, params, silent) {
-    var hash = "#" + page + (params ? ("&" + encodeParam(params)) : "");
-    if (window.location.hash !== hash) {
-      if (silent) {
-        history.pushState(hash);
-      } else {
-        window.location.hash = hash;
-      }
-    }
-  };
+  (function(){
+    var query = app.query = {};
 
-  app.query = (function(){
-    var query = {};
-
-    function parse() {
-      queryString = window.location.hash.substring(1);
+    var parseUrl = function(url) {
+      var parts = url.split("#");
+      queryString = parts[1];
       var decoded = decodeParam(queryString);
       var changed = {};
       for (var i in decoded) {
@@ -63,24 +53,38 @@ F(function(namespace){
       }
       removeList.forEach(function(v){ delete query[v]; });
       return changed;
-    }
+    };
 
-    window.onpopstate = function(){
-      var changed = parse();
+    var triggerStateChange = function(url){
+      var changed = parseUrl(url);
       for (var i in changed) {
-        namespace.Pubsub.publish("app.query.changed", changed);
+        F.Pubsub.publish("app.query.changed", changed);
         break;
       }
-    };
-    parse();
+    }
 
-    return query;
+    app.navigate = function(url) {
+      if (url !== window.location.href) {
+        triggerStateChange(url);
+        history.pushState("", "", url);
+      }
+    };
+
+    triggerStateChange(window.location.href);
+
+    window.onpopstate = function(e){
+      // if (!e.originalEvent.state) {
+      //   return;
+      // }
+      triggerStateChange(window.location.href);
+    };
+
   })();
 
-  app.Router = namespace.Component.extend({
+  app.Router = F.Component.extend({
     getDefaultName: function() { throw new Error("to be extended"); },
     getComponentName: function(changedQuery, callback) { throw new Error("to be extended"); },
-    template: '{{#name}}<div data-role="component" data-name="{{name}}" />{{/name}}',
+    template: '{{#name}}<div f-component="{{name}}" />{{/name}}',
     init: function(name, $container, env) {
       var self = this;
       self._super(name, $container, env);

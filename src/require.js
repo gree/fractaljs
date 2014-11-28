@@ -1,15 +1,11 @@
-F(function(namespace){
-  var TYPE = namespace.ClassType, createAsyncCall = namespace.createAsyncCall;
+(function(namespace){ // dev
 
-  var getResourceType = (function(){
-    var KNOWN_TYPES = {js:1, css:1, tmpl:1};
-    return function(name) {
-      var type = name.split(".").pop();
-      return (type in KNOWN_TYPES) ? type : "tmpl";
-    };
-  })();
+  // import
+  var ClassType = namespace.ClassType, // dev
+  createAsyncCall = namespace.createAsyncCall, // dev
+  forEachAsync = namespace.forEachAsync; // dev
 
-  (function(){
+  var ObjectLoader = (function(){
     var data = null,
     dataOwner = null,
     refCount = 0,
@@ -40,44 +36,47 @@ F(function(namespace){
       }
     };
 
-    var loadObjects = (function(){
-      var asyncCall = createAsyncCall();
+    var asyncCall = createAsyncCall();
 
-      var main = function(url, name, callback) {
-        console.debug("loadObjects", name, url);
-        if (lock(name)) {
-          require(url, function(){
-            var data = release(name);
-            if (queue.length) queue.shift()();
-            callback(data);
-          });
-        } else {
-          queue.push(function(){
-            main(url, name, callback);
-          });
-        }
-      };
-
-      return function(name, url, callback) {
-        asyncCall(url, main, name, callback);
-      };
-    })();
-
-    namespace.define = function(name, constructor) {
-      console.debug("define", name, "dataOwner", dataOwner);
-      data[name] = constructor;
+    var main = function(url, name, callback) {
+      console.debug("loadObjects", name, url);
+      if (lock(name)) {
+        require(url, function(){
+          var data = release(name);
+          if (queue.length) queue.shift()();
+          callback(data);
+        });
+      } else {
+        queue.push(function(){
+          main(url, name, callback);
+        });
+      }
     };
 
-    namespace.requireComponent = function(envName, url, callback) {
-      loadObjects(TYPE.COMPONENT + "." + envName, url, callback);
+    var load =  function(name, url, callback) {
+      asyncCall(url, main, name, callback);
     };
 
-    namespace.requireEnv = function(url, callback) {
-      loadObjects(TYPE.ENV, url, callback);
+    return {
+      define: function(name, constructor) {
+        data[name] = constructor;
+      },
+      requireComponent: function(envName, url, callback) {
+        load(ClassType.COMPONENT + "." + envName, url, callback);
+      },
+      requireEnv: function(url, callback) {
+        load(ClassType.ENV, url, callback);
+      },
     };
   })();
 
-  var require = namespace.require = (function(){
+  var require = (function(){
+    var KNOWN_TYPES = {js:1, css:1, tmpl:1};
+    var getResourceType = function(name) {
+      var type = name.split(".").pop();
+      return (type in KNOWN_TYPES) ? type : "tmpl";
+    };
+
     var byAddingElement = function(element, callback) {
       var done = false;
       element.onload = element.onreadystatechange = function(){
@@ -154,7 +153,7 @@ F(function(namespace){
       }
       if (!urlList.length) return callback();
       var retData = {};
-      namespace.forEachAsync(
+      forEachAsync(
         urlList,
         function(v, cb){
           singleRequire(v, function(data, id){
@@ -168,5 +167,9 @@ F(function(namespace){
       );
     };
   })();
-});
+
+  namespace.ObjectLoader = ObjectLoader; // dev
+  namespace.require = require; // dev
+
+})(F.__); // dev
 

@@ -11,7 +11,7 @@ F("testBody", F.app.Router.extend({
   },
   getComponentName: function(changed, cb) {
     if (changed.name) {
-      cb(F.app.query.name + ":" + main);
+      cb(F.app.query.name + ":main");
     } else {
       cb();
     }
