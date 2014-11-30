@@ -11,14 +11,6 @@ F.Component = (function(){
   COMPONENT_ATTR = "f-component",
   __defaultLoadHandler = function(callback, param) { callback(); };
 
-  var getConstructor = function(constructor, env, callback) {
-    if (isClass(constructor, ClassType.COMPONENT)) {
-      callback(constructor);
-    } else {
-      constructor(env, callback);
-    }
-  };
-
   return createClass(ClassType.COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
@@ -125,14 +117,12 @@ F.Component = (function(){
       forEachAsync(els, function(container, cb){
         var $container = $(container);
         var fullName = $container.attr(COMPONENT_ATTR);
-        self.F.requireComponent(fullName, function(constructor, componentName, env){
-          getConstructor(constructor, env, function(constructor){
-            if (!isClass(constructor, COMPONENT)) {
-              throw new Error("not component class: " + env.name + ":" + componentName);
-            }
-            var c = new constructor(componentName, $container, env);
-            c.load(param, cb);
-          });
+        self.F.requireComponent(fullName, function(constructor, name, env){
+          if (!isClass(constructor, COMPONENT)) {
+            throw new Error("not component class: " + env.name + ":" + name);
+          }
+          var c = new constructor(name, $container, env);
+          c.load(param, cb);
         });
       }, function(){
         if (callback) callback();

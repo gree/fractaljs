@@ -56,48 +56,37 @@
 
 // Source: src/utils.js
 
-  var forEachAsync = function(items, asyncCall, done) {
+  var forEachAsync = function(items, fn, done) {
     var len = items.length;
     if (!len) return done();
     var i = 0, complete = 0;
     for (; i<len; ++i) {
-      asyncCall(items[i], function(){
+      fn(items[i], function(){
         if (++complete === len) done();
       });
     }
   };
 
-  var createAsyncCall = function(){
+  var createAsyncOnce = function(){
     var listeners = {};
-
-    var releaseListeners = function(key, result) {
-      var q = listeners[key];
-      delete listeners[key];
-      q.forEach(function(v){
-        v(result);
-      });
-    };
-
-    return function(key, main, param, callback) {
+    return function(key, fn, callback) {
       if (key in listeners) {
         listeners[key].push(callback);
-        return;
+      } else {
+        listeners[key] = [callback];
+        fn(function(f){
+          var q = listeners[key];
+          delete listeners[key];
+          var i = 0, len = q.length;
+          for(; i < len; ++i){
+            f(q[i]);
+          }
+        });
       }
-      var timeout = setTimeout(function(){
-        console.error('asyncCall timeout: ' + key);
-        releaseListeners(key);
-      }, 20000);
-
-      listeners[key] = [callback];
-
-      main(key, param, function(result){
-        clearTimeout(timeout);
-        releaseListeners(key, result);
-      });
     }
   };
 
-  var defineClass = function(type){
+  var createClass = function(type){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
      * MIT Licensed.
@@ -192,9 +181,9 @@
       }
     };
 
-    var asyncCall = createAsyncCall();
+    var asyncOnce = createAsyncOnce();
 
-    var main = function(url, name, callback) {
+    var main = function(name, url, callback) {
       if (lock(name)) {
         require(url, function(){
           var data = release(name);
@@ -203,13 +192,17 @@
         });
       } else {
         queue.push(function(){
-          main(url, name, callback);
+          main(name, url, callback);
         });
       }
     };
 
     var load =  function(name, url, callback) {
-      asyncCall(url, main, name, callback);
+      asyncOnce(url, function(cb){
+        main(name, url, function(data){
+          cb(function(cb){ cb(data); });
+        });
+      }, callback);
     };
 
     return {
@@ -278,11 +271,11 @@
       "tmpl": byAjax
     };
 
-    var singleRequire = (function(){
+    return (function(){
       var cache = {};
-      var asyncCall = createAsyncCall();
+      var asyncOnce = createAsyncOnce();
 
-      var main = function(url, param, callback) {
+      var main = function(url, callback) {
         var type = getResourceType(url);
         Type2Getter[type](url, function(err, data) {
           if (err) {
@@ -297,29 +290,13 @@
         if (url in cache) {
           return callback(cache[url]);
         }
-        asyncCall(url, main, null, callback);
+        asyncOnce(url, function(cb){
+          main(url, function(data){
+            cb(function(cb){ cb(data); });
+          });
+        }, callback);
       };
     })();
-
-    return function(urlList, callback) {
-      if (!Array.isArray(urlList)) {
-        return singleRequire(urlList, callback);
-      }
-      if (!urlList.length) return callback();
-      var retData = {};
-      forEachAsync(
-        urlList,
-        function(v, cb){
-          singleRequire(v, function(data, id){
-            retData[id] = data;
-            cb();
-          });
-        },
-        function(){
-          callback(retData);
-        }
-      );
-    };
   })();
 
 
@@ -418,7 +395,7 @@ F.Env = (function(){
   })(window.location.protocol);
 
   var resolveEnv = (function(){
-    var cache = {}, asyncCall = createAsyncCall();
+    var cache = {}, asyncOnce = createAsyncOnce();
 
     var createEnv = function(constructor, name, url, callback) {
       var env = new constructor(name, url);
@@ -428,7 +405,7 @@ F.Env = (function(){
       });
     };
 
-    var main = function(envName, param, callback) {
+    var main = function(envName, callback) {
       if (!(envName in descriptors)) throw new Error("unknown env name: " + envName);
       var url = descriptors[envName];
       var ext = url.split(".").pop();
@@ -447,11 +424,15 @@ F.Env = (function(){
       if (envName in cache) {
         return callback(cache[envName]);
       }
-      asyncCall(envName, main, null, callback);
+      asyncOnce(envName, function(cb){
+        main(envName, function(data){
+          cb(function(cb){ cb(data); });
+        });
+      }, callback);
     };
   })();
 
-  return defineClass(ClassType.ENV).extend({
+  return createClass(ClassType.ENV).extend({
     PrefixComponent: "/",
     PrefixTemplate: "/",
     Envs: {},
@@ -475,7 +456,7 @@ F.Env = (function(){
       for (var i in self.Envs) {
         descriptors[i] = self.resolveUrl(self.Envs[i]);
       }
-      self.asyncCall = createAsyncCall();
+      self.asyncOnce = createAsyncOnce();
       self.components = {};
     },
 
@@ -503,60 +484,82 @@ F.Env = (function(){
       if (!Array.isArray(names)) {
         require(self.resolveUrl(names), callback);
       } else {
-        require(names.map(function(v){ return self.resolveUrl(v); }), callback);
+        var ret = {};
+        forEachAsync(
+          names,
+          function(name, cb){
+            require(self.resolveUrl(name), function(data){
+              ret[name] = data;
+              cb();
+            });
+          },
+          function(){
+            callback(ret);
+          }
+        );
       }
     },
     getTemplate: (function(){
-      var main = function(name, param, callback) {
-        var self = this;
+      var main = function(self, name, callback) {
         self.require(name, function(data){
           callback(self.compile(data));
         });
       };
       return function(name, callback) {
         var self = this;
-        self.asyncCall(
-          self.PrefixTemplate + name + ".tmpl",
-          main.bind(self), null, callback
-        );
+        var tmplPath = self.PrefixTemplate + name + ".tmpl";
+        self.asyncOnce(tmplPath, function(cb){
+          main(self, tmplPath, function(data){
+            cb(function(cb){ cb(data); });
+          });
+        }, callback);
       };
     })(),
     requireComponent: (function(){
-      var main = function(name, param, callback) {
-        var self = this;
-        var url = self.resolveUrl(self.PrefixComponent + name + ".js");
-        ObjectLoader.requireComponent(self.name, url, function(components){
-          for (var i in components) {
-            self.components[i] = components[i];
+      var main = function(env, envName, compoName, callback) {
+        if (envName !== env.name) {
+          resolveEnv(envName, function(env){
+            main(env, envName, compoName, callback);
+          });
+        } else {
+          var cache = env.components;
+          if (compoName in cache) {
+            return callback(cache[compoName], compoName, env);
           }
-          callback(components[name]);
-        });
+
+          var url = env.resolveUrl(env.PrefixComponent + compoName + ".js");
+          ObjectLoader.requireComponent(envName, url, function(components){
+            for (var i in components) {
+              cache[i] = components[i];
+            }
+            callback(cache[compoName], compoName, env);
+          });
+        }
       };
 
       return function(fullName, callback) {
-        var self = this;
-        var componentName;
-
+        var self = this, envName, compoName;
         if (fullName.indexOf(":") >= 0) {
           var parts = fullName.split(":");
-          componentName = parts[1];
-          if (parts[0] !== self.name) {
-            resolveEnv(parts[0], function(env){
-              env.requireComponent(componentName, callback);
-            });
-            return;
-          }
+          envName = parts[0];
+          compoName = parts[1];
         } else {
-          componentName = fullName;
+          envName = self.name;
+          compoName = fullName;
+          fullName = envName + ":" + compoName;
         }
 
-        var components = self.components;
-        if (componentName in components) {
-          return callback(components[componentName], componentName, self);
-        }
-        self.asyncCall(componentName, main.bind(self), null, function(constructor){
-          callback(constructor, componentName, self);
-        });
+        self.asyncOnce(fullName, function(cb){
+          main(self, envName, compoName, function(constructor, name, env){
+            if (isClass(constructor, ClassType.COMPONENT)) {
+              cb(function(cb){ cb(constructor, name, env); });
+            } else {
+              constructor(env, function(constructor){
+                cb(function(cb){ cb(constructor, name, env); });
+              });
+            }
+          });
+        }, callback);
       };
     })(),
   });
@@ -573,15 +576,7 @@ F.Component = (function(){
   COMPONENT_ATTR = "f-component",
   __defaultLoadHandler = function(callback, param) { callback(); };
 
-  var getConstructor = function(constructor, env, callback) {
-    if (isClass(constructor, ClassType.COMPONENT)) {
-      callback(constructor);
-    } else {
-      constructor(env, callback);
-    }
-  };
-
-  return defineClass(ClassType.COMPONENT).extend({
+  return createClass(ClassType.COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;
@@ -686,14 +681,12 @@ F.Component = (function(){
       forEachAsync(els, function(container, cb){
         var $container = $(container);
         var fullName = $container.attr(COMPONENT_ATTR);
-        self.F.requireComponent(fullName, function(constructor, componentName, env){
-          getConstructor(constructor, env, function(constructor){
-            if (!isClass(constructor, COMPONENT)) {
-              throw new Error("not component class: " + env.name + ":" + componentName);
-            }
-            var c = new constructor(componentName, $container, env);
-            c.load(param, cb);
-          });
+        self.F.requireComponent(fullName, function(constructor, name, env){
+          if (!isClass(constructor, COMPONENT)) {
+            throw new Error("not component class: " + env.name + ":" + name);
+          }
+          var c = new constructor(name, $container, env);
+          c.load(param, cb);
         });
       }, function(){
         if (callback) callback();

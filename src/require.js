@@ -2,8 +2,7 @@
 
   // import
   var ClassType = namespace.ClassType, // dev
-  createAsyncOnce = namespace.createAsyncOnce, // dev
-  forEachAsync = namespace.forEachAsync; // dev
+  createAsyncOnce = namespace.createAsyncOnce; // dev
 
   var ObjectLoader = (function(){
     var data = null,
@@ -38,7 +37,7 @@
 
     var asyncOnce = createAsyncOnce();
 
-    var main = function(url, name, callback) {
+    var main = function(name, url, callback) {
       console.debug("loadObjects", name, url);
       if (lock(name)) {
         require(url, function(){
@@ -48,13 +47,17 @@
         });
       } else {
         queue.push(function(){
-          main(url, name, callback);
+          main(name, url, callback);
         });
       }
     };
 
     var load =  function(name, url, callback) {
-      asyncOnce(url, main, name, callback);
+      asyncOnce(url, function(cb){
+        main(name, url, function(data){
+          cb(function(cb){ cb(data); });
+        });
+      }, callback);
     };
 
     return {
@@ -123,11 +126,11 @@
       "tmpl": byAjax
     };
 
-    var singleRequire = (function(){
+    return (function(){
       var cache = {};
       var asyncOnce = createAsyncOnce();
 
-      var main = function(url, param, callback) {
+      var main = function(url, callback) {
         var type = getResourceType(url);
         console.log("network require", url)
         Type2Getter[type](url, function(err, data) {
@@ -143,29 +146,13 @@
         if (url in cache) {
           return callback(cache[url]);
         }
-        asyncOnce(url, main, null, callback);
+        asyncOnce(url, function(cb){
+          main(url, function(data){
+            cb(function(cb){ cb(data); });
+          });
+        }, callback);
       };
     })();
-
-    return function(urlList, callback) {
-      if (!Array.isArray(urlList)) {
-        return singleRequire(urlList, callback);
-      }
-      if (!urlList.length) return callback();
-      var retData = {};
-      forEachAsync(
-        urlList,
-        function(v, cb){
-          singleRequire(v, function(data, id){
-            retData[id] = data;
-            cb();
-          });
-        },
-        function(){
-          callback(retData);
-        }
-      );
-    };
   })();
 
   namespace.ObjectLoader = ObjectLoader; // dev

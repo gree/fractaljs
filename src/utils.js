@@ -1,11 +1,11 @@
 (function(namespace){ // dev
 
-  var forEachAsync = function(items, asyncCall, done) {
+  var forEachAsync = function(items, fn, done) {
     var len = items.length;
     if (!len) return done();
     var i = 0, complete = 0;
     for (; i<len; ++i) {
-      asyncCall(items[i], function(){
+      fn(items[i], function(){
         if (++complete === len) done();
       });
     }
@@ -13,32 +13,20 @@
 
   var createAsyncOnce = function(){
     var listeners = {};
-
-    var releaseListeners = function(key, result) {
-      //console.debug("asyncCall", key, "releaselisteners", listeners[key].length);
-      var q = listeners[key];
-      delete listeners[key];
-      q.forEach(function(v){
-        v(result);
-      });
-    };
-
-    return function(key, main, param, callback) {
+    return function(key, fn, callback) {
       if (key in listeners) {
         listeners[key].push(callback);
-        return;
+      } else {
+        listeners[key] = [callback];
+        fn(function(f){
+          var q = listeners[key];
+          delete listeners[key];
+          var i = 0, len = q.length;
+          for(; i < len; ++i){
+            f(q[i]);
+          }
+        });
       }
-      var timeout = setTimeout(function(){
-        console.error('asyncCall timeout: ' + key);
-        releaseListeners(key);
-      }, 20000);
-
-      listeners[key] = [callback];
-
-      main(key, param, function(result){
-        clearTimeout(timeout);
-        releaseListeners(key, result);
-      });
     }
   };
 
