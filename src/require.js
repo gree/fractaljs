@@ -2,7 +2,7 @@
 
   // import
   var ClassType = namespace.ClassType, // dev
-  createAsyncCall = namespace.createAsyncCall, // dev
+  createAsyncOnce = namespace.createAsyncOnce, // dev
   forEachAsync = namespace.forEachAsync; // dev
 
   var ObjectLoader = (function(){
@@ -36,7 +36,7 @@
       }
     };
 
-    var asyncCall = createAsyncCall();
+    var asyncOnce = createAsyncOnce();
 
     var main = function(url, name, callback) {
       console.debug("loadObjects", name, url);
@@ -54,7 +54,7 @@
     };
 
     var load =  function(name, url, callback) {
-      asyncCall(url, main, name, callback);
+      asyncOnce(url, main, name, callback);
     };
 
     return {
@@ -125,7 +125,7 @@
 
     var singleRequire = (function(){
       var cache = {};
-      var asyncCall = createAsyncCall();
+      var asyncOnce = createAsyncOnce();
 
       var main = function(url, param, callback) {
         var type = getResourceType(url);
@@ -143,7 +143,7 @@
         if (url in cache) {
           return callback(cache[url]);
         }
-        asyncCall(url, main, null, callback);
+        asyncOnce(url, main, null, callback);
       };
     })();
 

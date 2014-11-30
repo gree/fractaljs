@@ -3,9 +3,9 @@ F.Env = (function(){
   var namespace = F.__; // dev
   var isClass = namespace.isClass, // dev
   ClassType = namespace.ClassType, // dev
-  createAsyncCall = namespace.createAsyncCall, // dev
+  createAsyncOnce = namespace.createAsyncOnce, // dev
   require = namespace.require, // dev
-  defineClass = namespace.defineClass, // dev
+  createClass = namespace.createClass, // dev
   ObjectLoader = namespace.ObjectLoader; // dev
 
   var descriptors = {};
@@ -15,7 +15,7 @@ F.Env = (function(){
   })(window.location.protocol);
 
   var resolveEnv = (function(){
-    var cache = {}, asyncCall = createAsyncCall();
+    var cache = {}, asyncOnce = createAsyncOnce();
 
     var createEnv = function(constructor, name, url, callback) {
       var env = new constructor(name, url);
@@ -44,11 +44,11 @@ F.Env = (function(){
       if (envName in cache) {
         return callback(cache[envName]);
       }
-      asyncCall(envName, main, null, callback);
+      asyncOnce(envName, main, null, callback);
     };
   })();
 
-  return defineClass(ClassType.ENV).extend({
+  return createClass(ClassType.ENV).extend({
     PrefixComponent: "/",
     PrefixTemplate: "/",
     Envs: {},
@@ -72,7 +72,7 @@ F.Env = (function(){
       for (var i in self.Envs) {
         descriptors[i] = self.resolveUrl(self.Envs[i]);
       }
-      self.asyncCall = createAsyncCall();
+      self.asyncOnce = createAsyncOnce();
       self.components = {};
     },
 
@@ -112,7 +112,7 @@ F.Env = (function(){
       };
       return function(name, callback) {
         var self = this;
-        self.asyncCall(
+        self.asyncOnce(
           self.PrefixTemplate + name + ".tmpl",
           main.bind(self), null, callback
         );
@@ -151,7 +151,7 @@ F.Env = (function(){
         if (componentName in components) {
           return callback(components[componentName], componentName, self);
         }
-        self.asyncCall(componentName, main.bind(self), null, function(constructor){
+        self.asyncOnce(componentName, main.bind(self), null, function(constructor){
           callback(constructor, componentName, self);
         });
       };

@@ -11,7 +11,7 @@
     }
   };
 
-  var createAsyncCall = function(){
+  var createAsyncOnce = function(){
     var listeners = {};
 
     var releaseListeners = function(key, result) {
@@ -42,7 +42,7 @@
     }
   };
 
-  var defineClass = function(type){
+  var createClass = function(type){
     /* Simple JavaScript Inheritance
      * By John Resig http://ejohn.org/
      * MIT Licensed.
@@ -102,8 +102,8 @@
   };
 
   namespace.forEachAsync = forEachAsync; // dev
-  namespace.createAsyncCall = createAsyncCall; // dev
-  namespace.defineClass = defineClass; // dev
+  namespace.createAsyncOnce = createAsyncOnce; // dev
+  namespace.createClass = createClass; // dev
   namespace.isClass = isClass; // dev
   namespace.ClassType = ClassType; // dev
 

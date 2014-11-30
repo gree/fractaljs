@@ -3,7 +3,7 @@ F.Component = (function(){
   var namespace = F.__; // dev
   var isClass = namespace.isClass; // dev
   var ClassType = namespace.ClassType; // dev
-  var defineClass = namespace.defineClass; // dev
+  var createClass = namespace.createClass; // dev
   var forEachAsync = namespace.forEachAsync; // dev
 
   var pubsub = F.Pubsub,
@@ -19,7 +19,7 @@ F.Component = (function(){
     }
   };
 
-  return defineClass(ClassType.COMPONENT).extend({
+  return createClass(ClassType.COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;
