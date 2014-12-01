@@ -3,6 +3,7 @@ F("list", F.Component.extend({
     cb({
       examples: [
         "markdown",
+        "gitrepo",
       ]
     });
   }
