@@ -57,13 +57,16 @@
 // Source: src/utils.js
 
   var forEachAsync = function(items, fn, done) {
-    var len = items.length;
-    if (!len) return done();
-    var i = 0, complete = 0;
-    for (; i<len; ++i) {
-      fn(items[i], function(){
-        if (++complete === len) done();
-      });
+    var count, left;
+    count = left = items.length;
+    if (!count) {
+      done();
+    } else {
+      while (count) {
+        fn(items[--count], function(){
+          if (!--left) done();
+        });
+      }
     }
   };
 
@@ -75,12 +78,9 @@
       } else {
         listeners[key] = [callback];
         fn(function(f){
-          var q = listeners[key];
+          var q = listeners[key], count = q.length;
           delete listeners[key];
-          var i = 0, len = q.length;
-          for(; i < len; ++i){
-            f(q[i]);
-          }
+          while(count) f(q[--count]);
         });
       }
     }
@@ -576,7 +576,7 @@ F.Component = (function(){
   COMPONENT_ATTR = "f-component",
   __defaultLoadHandler = function(callback, param) { callback(); };
 
-  return createClass(ClassType.COMPONENT).extend({
+  return createClass(COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;

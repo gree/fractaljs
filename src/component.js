@@ -11,7 +11,7 @@ F.Component = (function(){
   COMPONENT_ATTR = "f-component",
   __defaultLoadHandler = function(callback, param) { callback(); };
 
-  return createClass(ClassType.COMPONENT).extend({
+  return createClass(COMPONENT).extend({
     init: function(name, $container, env){
       var self = this;
       self.name = name;
