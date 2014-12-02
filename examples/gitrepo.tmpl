@@ -1,0 +1,33 @@
+<div f-component="gitbranches">
+  {{=<% %>=}}
+  <script type="text/template">
+    {{#branches}}
+    {{#isCurrent}}
+    <strong>{{name}}</strong>
+    {{/isCurrent}}
+    {{^isCurrent}}
+    <a href="#gitrepo&br={{name}}">{{name}}</a>
+    {{/isCurrent}}
+    {{/branches}}
+  </script>
+  <%={{ }}=%>
+</div>
+
+<hr/>
+
+<div f-component="gitcommits">
+  {{=<% %>=}}
+  <script type="text/template">
+    <ul>
+      {{#commits}}
+      <li>
+        <a href="{{html_url}}" target="_blank" class="commit">{{sha}}</a>
+        - <span class="message">{{commit.message}}</span><br>
+        by <span class="author">{{commit.author.name}}</span>
+        at <span class="date">{{commit.author.date}}</span>
+      </li>
+      {{/commits}}
+      <ul>
+  </script>
+  <%={{ }}=%>
+</div>
