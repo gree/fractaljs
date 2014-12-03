@@ -79,14 +79,8 @@ F.Component = (function(){
       if (self.template) {
         return callback();
       }
-
-      var $tmpl = self.$('script[type="text/template"]');
-      if ($tmpl.length > 0) {
-        self.template = self.F.compile($tmpl.html());
-        return callback();
-      }
-
-      self.F.getTemplate(self.templateName || self.name, function(template){
+      var templateName = self.templateName || self.name;
+      self.F.getTemplate(templateName, function(template){
         self.template = template;
         callback();
       });

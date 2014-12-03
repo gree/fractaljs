@@ -78,7 +78,10 @@ F.Env = (function(){
         descriptors[i] = self.resolveUrl(self.Envs[i]);
       }
       self.asyncOnce = createAsyncOnce();
+
+      // cache
       self.components = {};
+      self.templates = {};
     },
 
     resolveUrl: function(name) {
@@ -121,16 +124,33 @@ F.Env = (function(){
       }
     },
     getTemplate: (function(){
+      var tmplExt = "tmpl";
+
       var main = function(self, name, callback) {
         self.require(name, function(data){
           callback(self.compile(data));
         });
       };
+
       return function(name, callback) {
         var self = this;
-        var tmplPath = self.PrefixTemplate + name + ".tmpl";
+        if (name in self.templates) {
+          return callback(self.templates[name]);
+        }
+        var ext = name.split(".").pop();
+        if (ext !== tmplExt) {
+          // TODO have to find globally ?
+          var $tmpl = $("template#template_" + name);
+          if ($tmpl.length > 0) {
+            var template = self.templates[name] = self.compile($tmpl.html());
+            return callback(template);
+          }
+        }
+        var tmplPath = self.PrefixTemplate + name;
+        if (ext !== tmplExt) tmplPath += "." + tmplExt;
         self.asyncOnce(tmplPath, function(cb){
           main(self, tmplPath, function(data){
+            self.templates[name] = data;
             cb(function(cb){ cb(data); });
           });
         }, callback);
