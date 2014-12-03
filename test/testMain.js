@@ -1,13 +1,9 @@
 F("testMain", F.Component.extend({
   getData: function(cb) {
-    cb({
-      tests: [
-        "list",
-        "recursive",
-        "namespace",
-        "require",
-        "history",
-      ]
-    });
+    var envs = [];
+    for (var i in this.F.Envs) {
+      envs.push(i);
+    }
+    cb({ tests: envs.sort() });
   },
 }));
