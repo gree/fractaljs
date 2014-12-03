@@ -1,23 +1,18 @@
-<div f-component="gitbranches">
+<div f-component="gitrepo_branches">
   {{=<% %>=}}
   <script type="text/template">
+    <h5>BRANCHES</h5>
     {{#branches}}
-    {{#isCurrent}}
-    <strong>{{name}}</strong>
-    {{/isCurrent}}
-    {{^isCurrent}}
-    <a href="#gitrepo&br={{name}}">{{name}}</a>
-    {{/isCurrent}}
+    <span f-component="gitrepo_branch_name" data-br="{{name}}"></span>
     {{/branches}}
   </script>
   <%={{ }}=%>
 </div>
 
-<hr/>
-
-<div f-component="gitcommits">
+<div f-component="gitrepo_commits">
   {{=<% %>=}}
   <script type="text/template">
+    <h5>COMMITS</h5>
     <ul>
       {{#commits}}
       <li>

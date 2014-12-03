@@ -7,7 +7,7 @@ var API = {
 };
 
 
-var BranchMonitor = F.Component.extend({
+var br_monitor = F.Component.extend({
   init: function(name, $container, env) {
     var self = this;
     self._super(name, $container, env);
@@ -20,26 +20,37 @@ var BranchMonitor = F.Component.extend({
   }
 });
 
-F("gitbranches", BranchMonitor.extend({
+F("gitrepo_branches", F.Component.extend({
   getData: function(cb, param) {
     var self = this;
-    if (self.cached) cb({branches: self.cached});
-    else {
-      $.get(API.branches, function(data){
-        for (var i in data) {
-          if (data[i].name === self.getBr(param)) data[i].isCurrent = true;
-        }
-        cb({branches: data});
-      });
-    }
+    $.get(API.branches, function(data){
+      cb({branches: data});
+    });
   }
 }));
 
-F("gitcommits", BranchMonitor.extend({
+F("gitrepo_branch_name", br_monitor.extend({
+  template: '{{#isCurrent}}<strong>{{name}}</strong>{{/isCurrent}}' +
+    '{{^isCurrent}}<a href="#gitrepo&br={{name}}">{{name}}</a>{{/isCurrent}}',
+  getData: function(cb, param) {
+    if (!this.br) this.br = this.$container.data("br");
+    cb({
+      isCurrent: this.getBr(param) === this.br,
+      name: this.br
+    });
+  }
+}));
+
+F("gitrepo_commits", br_monitor.extend({
   getData: function(cb, param) {
     var self = this;
     $.get(API.commits(self.getBr(param)), function(data){
+      data = data.map(function(v){
+        v.sha = v.sha.substr(0, 10);
+        return v;
+      });
       cb({commits: data});
     });
   }
 }));
+
