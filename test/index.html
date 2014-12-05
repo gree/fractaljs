@@ -4,17 +4,21 @@
     <title>FractalJS App</title>
   </head>
   <body>
-    <div data-role="component" data-name="main"></div>
+    <div f-component="main"></div>
 
-    <script type="text/javascript" src="../dist/fractal.min.js"></script>
+    <script type="text/javascript" src="../dist/fractal.js"></script>
+    <script type="text/javascript" src="../experimental/app.js"></script>
     <script type="text/javascript">
-      var config = {
+      var env = new (F.Env.extend({
         Envs: {
-          font: 'font/',
-          color: 'color/index.js'
-        }
-      };
-      F.construct(config);
+          namespace: "namespace/config.js",
+          recursive: "recursive/",
+          list: "list/",
+          require: "require/config.js",
+          template: "template/",
+        },
+      }))("local");
+      F.init(env);
     </script>
   </body>
 </html>

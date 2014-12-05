@@ -1,0 +1,37 @@
+<h6>inside_component</h6>
+<div f-component="inside_component"></div>
+
+<h6>external_file</h6>
+<div f-component="external_file"></div>
+
+<h6>inside_dom</h6>
+<div f-component="inside_dom"></div>
+
+<h6>externla_file_name</h6>
+<div f-component="external_file_name"></div>
+
+<h6>inside_dom_name</h6>
+<div f-component="inside_dom_name"></div>
+
+<h6>nested</h6>
+<div f-component="nested"></div>
+
+<h6>partial</h6>
+<div f-component="partial"></div>
+
+
+{{=<% %>=}}
+
+<template id="template_inside_dom">
+  <span>{{name}}</span>
+</template>
+
+<template id="template_inside_dom_other_name">
+  <span>{{name}}</span>
+</template>
+
+<template id="template_partial_inside_dom">
+  partial_inside_dom {{a}}
+</template>
+
+<%={{ }}=%>

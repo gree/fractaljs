@@ -1,66 +1,59 @@
-(function(global){
-  var ready = false;
-  var readyListeners = [];
-  var namespace = {};
+(function(global){ // dev
 
-  var F = global.Fractal = global.F = function(arg1, arg2){
+  var namespace = {}, ready = false, listeners = [];
+
+  var F = global.F = function(arg1, arg2){
+    var ObjectLoader = namespace.ObjectLoader; // dev
+    var isClass = namespace.isClass; // dev
+
     var callback = null;
-
-    if (typeof(arg1) === 'function') {
+    if (typeof(arg1) === "function") {
       // 'onready' event handler
       callback = arg1;
-    } else if (typeof(arg1) === 'string' && typeof(arg2) === 'function') {
-      // define a component
-      var name = arg1, component = arg2;
+    } else if (typeof(arg1) === "string" && arg2) {
+      // define an object
+      var name = arg1, object = arg2;
       callback = function(){
-        namespace.ObjectLoader.component.define(name, component);
+        ObjectLoader.define(name, object);
       };
-    } else if (typeof(arg1) === 'object') {
-      // env config
-      var config = arg1;
-      callback = function(){
-        namespace.ObjectLoader.config.define(config);
-      }
+    } else {
+      return;
     }
-
-    if (!callback) return;
-    if (ready) return callback();
-    readyListeners.push(callback);
+    if (ready) {
+      callback(namespace);
+    } else {
+      listeners.push(callback);
+    }
   };
 
-  F.__ = namespace;
-  F.construct = function(config, callback){
-    if (typeof(config) === "function") {
-      callback = config;
-      config = {};
+  F.__ = namespace; // dev
+
+  F.init = function(env, callback){
+    F.init = function(){};
+
+    console.time("F.init");
+    if (typeof(env) === "function") {
+      callback = env;
+      env = null;
     }
-    namespace.createDefaultEnv(config, function(env){
-      console.debug("defaultEnv", env);
-      if (readyListeners && readyListeners.length) {
-        readyListeners.forEach(function(v){ v(); });
-        readyListeners = [];
-      }
-      F.Component = F.__.Component;
+    if (!env) env = new F.Env("");
+    env.setup(function(){
       ready = true;
-      var c = new F.Component("__ROOT__", $(global.document), env);
-      c.loadChildren(callback);
+      var i = 0, len = listeners.length;
+      for (; i < len; ++i) {
+        listeners[i](namespace);
+      }
+      listeners = [];
+
+      var c = new F.Component("", $(global.document), env);
+      c.loadChildren(function(){
+        console.timeEnd("F.construct");
+        if (callback) {
+          callback();
+        }
+      });
     });
   };
 
-  F.TOPIC = {
-    COMPONENT_LOADED_MYSELF: "component.loaded.myself",
-    COMPONENT_LOADED_CHILDREN: "component.loaded.children",
-  };
-
-  namespace.forEachAsync = function(items, onEach, onDone) {
-    var len = items.length;
-    if (!len) return onDone();
-    var i = 0, complete = 0;
-    for (; i<len; ++i) {
-      onEach(items[i], function(){
-        if (++complete === len) onDone();
-      });
-    }
-  };
-})(window);
+})(window); // dev
 

@@ -1,202 +1,209 @@
-(function(namespace, global){
-  var EnvDescs = {};
+F.Env = (function(){
+  // import
+  var namespace = F.__; // dev
+  var isClass = namespace.isClass, // dev
+  ClassType = namespace.ClassType, // dev
+  createAsyncOnce = namespace.createAsyncOnce, // dev
+  require = namespace.require, // dev
+  createClass = namespace.createClass, // dev
+  forEachAsync = namespace.forEachAsync, //dev
+  ObjectLoader = namespace.ObjectLoader; // dev
 
-  var getType = (function(){
-    var KNOWN_TYPES = {js:1, css:1, tmpl:1};
-    return function(name) {
-      var type = name.split('.').pop();
-      return (type in KNOWN_TYPES) ? type : 'tmpl';
+  var descriptors = {};
+
+  var protocol = (function(protocol){
+    return (protocol === "file:") ? "http:" : protocol;
+  })(window.location.protocol);
+
+  var resolveEnv = (function(){
+    var cache = {}, asyncOnce = createAsyncOnce();
+
+    var createEnv = function(constructor, name, url, callback) {
+      var env = new constructor(name, url);
+      env.setup(function(){
+        cache[name] = env;
+        callback(env);
+      });
+    };
+
+    var main = function(envName, callback) {
+      if (!(envName in descriptors)) throw new Error("unknown env name: " + envName);
+      var url = descriptors[envName];
+      var ext = url.split(".").pop();
+      if (ext !== "js") {
+        if (url[url.length - 1] !== "/") url += "/";
+        createEnv(F.Env, envName, url, callback);
+      } else {
+        ObjectLoader.requireEnv(url, function(constructors){
+          var constructor = constructors[envName];
+          createEnv(constructor, envName, url, callback);
+        });
+      }
+    };
+
+    return function(envName, callback) {
+      if (envName in cache) {
+        return callback(cache[envName]);
+      }
+      asyncOnce(envName, function(cb){
+        main(envName, function(data){
+          cb(function(cb){ cb(data); });
+        });
+      }, callback);
     };
   })();
 
-  var Env = (function(){
-    var resolveUrl = function(self, name) {
-      var type = getType(name);
-      var url = (function(type){
-        if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
-        return self.SourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
-      })(type);
-      return { id: name, type: type, url: url };
-    };
+  return createClass(ClassType.ENV).extend({
+    PrefixComponent: "/",
+    PrefixTemplate: "/",
+    Envs: {},
+    Requires: [],
 
-    var protocol = global.location.protocol == 'file:' ? 'http:' : global.location.protocol;
-    var defaultConfig = {
-      DomParser: protocol + '//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js',
-      Template: {
-        Engine: protocol + '//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js',
-        Compile: function(text) { return Hogan.compile(text) },
-        Render: function(template, data, options) { return template.render(data, options); },
-      },
-      Prefix: {
-        Component: 'components/',
-        Template: 'templates/',
-      },
-      Envs: {},
-      Requires: [],
-    };
+    DomParser: protocol +
+      "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
+    TemplateEngine: protocol +
+      "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
+    compile: function(text) { return Hogan.compile(text) },
+    render: function(template, data, options) { return template.render(data, options); },
 
-    var Env = function(name, descUrl, config){
-      this.__name = name;
-      this.descUrl = descUrl;
-      config = config || {};
-
-      this.SourceRoot = config.SourceRoot || (function(url){
-        return url.split('/').slice(0, -1).join('/') + '/';
-      })(descUrl || global.location.pathname);
-
-      this.components = {};
-      for (var i in defaultConfig) {
-        this[i] = config[i] || defaultConfig[i];
-      }
+    init: function(name, url) {
       var self = this;
-      ['Template', 'Prefix'].forEach(function(v){
-        for (var i in defaultConfig[v]) {
-          self[v][i] = self[v][i] || defaultConfig[v][i];
-        }
-      });
-    };
-    var proto = Env.prototype;
-    proto.getDisplayName = function() { return this.__name || '[defaultEnv]'; };
-    proto.getName = function() { return this.__name; };
-    proto.init = function(callback) {
-      var self = this;
+      self.ready = false;
+      self.name = name;
+      self.SourceRoot = self.SourceRoot || (function(url){
+        return url.split("/").slice(0, -1).join("/") + "/";
+      })(url || window.location.pathname);
+
       for (var i in self.Envs) {
-        EnvDescs[i] = self.Envs[i];
+        descriptors[i] = self.resolveUrl(self.Envs[i]);
       }
-      self.require([self.DomParser, self.Template.Engine], function(){
+      self.asyncOnce = createAsyncOnce();
+
+      // cache
+      self.components = {};
+      self.templates = {};
+    },
+
+    resolveUrl: function(name) {
+      if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
+      return this.SourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
+    },
+    setup: function(callback) {
+      var self = this;
+      if (self.ready) return callback();
+      self.require([self.DomParser, self.TemplateEngine], function(){
         $.event.special.destroyed = {
           remove: function(o) {
             if (o.handler) o.handler();
           }
         };
         self.require(self.Requires, function(){
-          callback(self);
+          self.ready = true;
+          callback();
         });
       });
-    };
-
-    proto.require = function(names, callback){
+    },
+    require: function(names, callback){
       var self = this;
       if (!Array.isArray(names)) {
-        namespace.require(resolveUrl(self, names), callback);
+        require(self.resolveUrl(names), callback);
       } else {
-        namespace.require(names.map(function(v){ return resolveUrl(self, v); }), callback);
+        var ret = {};
+        forEachAsync(
+          names,
+          function(name, cb){
+            require(self.resolveUrl(name), function(data){
+              ret[name] = data;
+              cb();
+            });
+          },
+          function(){
+            callback(ret);
+          }
+        );
       }
-    };
+    },
+    getTemplate: (function(){
+      var tmplExt = "tmpl";
 
-    proto.getTemplate = (function(){
-      var __get = function(self, name, callback){
-        var tmplName = self.__name ? (self.__name + ':' + name) : name;
-        var $tmpl = $('script[type="text/template"][data-name="' + tmplName + '"]');
-        if ($tmpl.length > 0) {
-          callback(self.Template.Compile($tmpl.html()));
-        } else {
-          self.require(self.Prefix.Template + name + ".tmpl", function(data){
-            callback(self.Template.Compile(data));
-          });
-        }
+      var main = function(self, name, callback) {
+        self.require(name, function(data){
+          callback(self.compile(data));
+        });
       };
-      return function(names, callback){
+
+      return function(name, callback) {
         var self = this;
-        if (typeof(names) === "string") return __get(self, names, callback);
-        var results = {};
-        namespace.forEachAsync(names, function(v, cb){
-          __get(self, v, function(data){
-            results[v] = data;
-            cb();
-          });
-        }, function(){ callback(results); });
-      };
-    })();
-
-    proto.getComponentClass = function(name, callback){
-      var self = this;
-      if (name.indexOf(':') >= 0) {
-        var parts = name.split(':');
-        var envName = parts[0];
-        var componentName = parts[1];
-        getOrCreateEnv(envName, function(env){
-          console.debug("env: getComponentClass from other env", envName, componentName);
-          env.getComponentClass(componentName, callback);
-        });
-      } else {
-        if (name in self.components) {
-          console.debug("env: getComponentClass return from cache", self.getDisplayName(), name);
-          callback(self.components[name], name, self);
-        } else {
-          var url = resolveUrl(self, self.Prefix.Component + name + '.js');
-          namespace.ObjectLoader.component.load(url, function(components){
-            var asyncCalls = [];
-            for (var i in components) {
-              var constructor = components[i];
-              if (constructor.isComponent) {
-                console.log('env: load ' + name + ' into ' + self.getDisplayName());
-                self.components[i] = constructor;
-              } else {
-                // this componentClass will be generated from a function
-                asyncCalls.push({name: i, createClass: constructor});
-              }
-            }
-            namespace.forEachAsync(
-              asyncCalls,
-              function(v, cb){
-                v.createClass(self, function(componentClass){
-                  console.log('env: load ' + v.name + ' into ' + self.getDisplayName());
-                  self.components[v.name] = componentClass;
-                  cb();
-                });
-              },
-              function(){
-                if (!(name in components)) {
-                  throw new Error('component ' + name + ' is not found in ' + url.url);
-                }
-                callback(self.components[name], name, self);
-              }
-            );
-          }); // ObjectLoader.component.load
+        if (name in self.templates) {
+          return callback(self.templates[name]);
         }
-      }
-    };
+        var ext = name.split(".").pop();
+        if (ext !== tmplExt) {
+          // TODO have to find globally ?
+          var $tmpl = $("template#template_" + name);
+          if ($tmpl.length > 0) {
+            var template = self.templates[name] = self.compile($tmpl.html());
+            return callback(template);
+          }
+        }
+        var tmplPath = self.PrefixTemplate + name;
+        if (ext !== tmplExt) tmplPath += "." + tmplExt;
+        self.asyncOnce(tmplPath, function(cb){
+          main(self, tmplPath, function(data){
+            self.templates[name] = data;
+            cb(function(cb){ cb(data); });
+          });
+        }, callback);
+      };
+    })(),
+    requireComponent: (function(){
+      var main = function(env, envName, compoName, callback) {
+        if (envName !== env.name) {
+          resolveEnv(envName, function(env){
+            main(env, envName, compoName, callback);
+          });
+        } else {
+          var cache = env.components;
+          if (compoName in cache) {
+            return callback(cache[compoName], compoName, env);
+          }
 
-    return Env;
-  })();
-
-  var getOrCreateEnv = (function(){
-    var envs = {};
-    return function(envName, callback) {
-      if (!envName) return callback(namespace.defaultEnv);
-      if (envName in envs) return callback(envs[envName]);
-      if (!(envName in EnvDescs)) throw new Error('unknown env name: ' + envName);
-
-      var onEnvLoaded = function(env) {
-        console.log('env: create', env.getDisplayName(), 'root:', env.SourceRoot);
-        envs[envName] = env;
-        callback(env);
+          var url = env.resolveUrl(env.PrefixComponent + compoName + ".js");
+          ObjectLoader.requireComponent(envName, url, function(components){
+            for (var i in components) {
+              cache[i] = components[i];
+            }
+            callback(cache[compoName], compoName, env);
+          });
+        }
       };
 
-      var descUrl = EnvDescs[envName];
-      var ext = descUrl.split('.').pop();
-      if (ext !== 'js') {
-        if (descUrl[descUrl.length - 1] !== '/') descUrl += '/';
-        var env = new Env(envName, descUrl);
-          env.init(onEnvLoaded);
-      } else {
-        namespace.ObjectLoader.config.load({ type: 'js', url: descUrl }, function(config){
-          var env = new Env(envName, descUrl, config);
-          env.init(onEnvLoaded);
-        });
-      }
-    };
-  })();
+      return function(fullName, callback) {
+        var self = this, envName, compoName;
+        if (fullName.indexOf(":") >= 0) {
+          var parts = fullName.split(":");
+          envName = parts[0];
+          compoName = parts[1];
+        } else {
+          envName = self.name;
+          compoName = fullName;
+          fullName = envName + ":" + compoName;
+        }
 
-  namespace.createDefaultEnv = function(config, cb){
-    if (namespace.defaultEnv) return cb(namespace.defaultEnv);
-    var env = new Env("", "", config);
-    env.init(function(){
-      namespace.defaultEnv = env;
-      cb(env);
-    });
-  };
+        self.asyncOnce(fullName, function(cb){
+          main(self, envName, compoName, function(constructor, name, env){
+            if (isClass(constructor, ClassType.COMPONENT)) {
+              cb(function(cb){ cb(constructor, name, env); });
+            } else {
+              constructor(env, function(constructor){
+                cb(function(cb){ cb(constructor, name, env); });
+              });
+            }
+          });
+        }, callback);
+      };
+    })(),
+  });
 
-})(window.F.__, window);
+})();
 

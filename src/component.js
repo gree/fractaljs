@@ -1,197 +1,167 @@
-(function(namespace){
-  var Class = (function(){
-    /* Simple JavaScript Inheritance
-     * By John Resig http://ejohn.org/
-     * MIT Licensed.
-     */
-    // Inspired by base2 and Prototype
-    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
-    var Class = function(){};
-    Class.extend = function(prop) {
-      var _super = this.prototype;
+F.Component = (function(){
+  // import
+  var namespace = F.__; // dev
+  var isClass = namespace.isClass; // dev
+  var ClassType = namespace.ClassType; // dev
+  var createClass = namespace.createClass; // dev
+  var forEachAsync = namespace.forEachAsync; // dev
+  var setImmediate = namespace.setImmediate; // dev
 
-      initializing = true;
-      var prototype = new this();
-      initializing = false;
+  var pubsub = F.Pubsub,
+  COMPONENT = ClassType.COMPONENT,
+  COMPONENT_ATTR = "f-component",
+  __defaultLoadHandler = function(callback, param) { callback(); },
+  idSeq = 0;
 
-      for (var name in prop) {
-        prototype[name] = typeof prop[name] == "function" &&
-          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-          (function(name, fn){
-            return function() {
-              var tmp = this._super;
-              this._super = _super[name];
+  return createClass(COMPONENT).extend({
+    init: function(name, $container, env){
+      var self = this;
+      self.name = name;
+      self.$container = $container;
+      self.F = env;
+      self.fullName = self.F.name + ":" + name;
+      self.id = ++idSeq;
 
-              var ret = fn.apply(this, arguments);
-              this._super = tmp;
+      self.$ = self.$container.find.bind(self.$container);
+      if (self.resetDisplay) self.$container.css("display", self.resetDisplay);
+      self.$container.on("destroyed", self.unload.bind(self));
 
-              return ret;
-            };
-          })(name, prop[name]) :
-        prop[name];
-      }
-
-      var Class = function(){
-        if ( !initializing && this.init )
-          this.init.apply(this, arguments);
-      }
-
-      Class.prototype = prototype;
-      Class.prototype.constructor = Class;
-
-      Class.extend = arguments.callee;
-      Class.isComponent = true;
-      return Class;
-    };
-
-    return Class;
-  })();
-
-  namespace.Component = (function(){
-    var ComponentFilter = "[data-role=component]";
-    var setLoad = function(self, next) {
-      if (!next) return;
-      if (!self.__load){
-        self.__load = next;
-        return;
-      }
-      var temp = self.__load;
-      self.__load = function(callback, param) {
-        temp.bind(self)(function(){
-          next.bind(self)(callback, param);
-        }, param);
-      };
-    };
-
-    var Component = {};
-    Component.init = function(name, $container, env){
-      this.name = name;
-      this.$container = $container;
-      this.F = env;
-
-      this.$ = this.$container.find.bind(this.$container);
-      var resetDisplay = this.$container.data("display");
-      if (resetDisplay) this.$container.css("display", resetDisplay);
-      this.$container.on("destroyed", this.unload.bind(this));
-
-      this.rendered = false;
-      this.subscribeList = {};
-      this.earlyRecieved = [];
-      // // TODO implement if needed
+      self.rendered = false;
+      self.subscribeList = {};
+      self.earlyRecieved = [];
+      // TODO implement if needed
       // self.children = [];
       // self.parent = null;
-      this.templateName = this.templateName || this.name;
-      if (typeof(this.template) === "string") this.template = this.F.Template.Compile(this.template);
+      self.templateName = self.templateName || self.name;
+      if (typeof(self.template) === "string")
+        self.template = self.F.compile(self.template);
 
-      setLoad(this, this.getData);
-      setLoad(this, this.getTemplate);
-      setLoad(this, this.render);
-      setLoad(this, this.afterRender);
-      setLoad(this, this.myselfLoaded);
-      if (!this.loadMyselfOnly)
-        setLoad(this, this.loadChildren);
-      setLoad(this, this.allLoaded);
-
-      var subscribes = [];
-      for (var i in this) {
-        if (typeof(this[i]) === "function" && i.indexOf("on") === 0) {
-          subscribes.push([i.substr(2), this[i]]);
-        }
-      }
-      var publicMethods = this.Public || {};
+      var publicMethods = self.Public || {};
       for (var i in publicMethods) {
-        subscribes.push([this.F.getName() + ":" + this.name + "." + i, publicMethods[i]]);
-      }
-
-      var self = this;
-      subscribes.forEach(function(v){
         (function(topic, method){
           self.subscribe(topic, function(topic, data, from){
             method.bind(self)(data, from);
           });
-        })(v[0], v[1]);
-      });
-    };
-    Component.call = function(name, data) {
-      var topic = name;
-      if (name.indexOf(":") < 0) {
-        topic = this.F.getName() + ":" + topic;
+        })(self.fullName + "." + i, publicMethods[i]);
       }
-      this.publish(topic, data, this);
-    };
-    Component.__load = null;
+    },
+    call: function(methodName, data) {
+      var self = this;
+      if (methodName.indexOf(":") < 0) {
+        methodName = self.F.name + ":" + methodName;
+      }
+      self.publish(methodName, data, self);
+    },
+    load: (function(){
+      var seq = 0;
 
-    Component.load = function(param, callback){
-      param = param || {};
-      this.__load(function(){
-        if (callback) callback();
-      }, param);
-    };
-    Component.getData = null;
-    Component.getTemplate = function(callback) {
+      return function(param, callback){
+        var self = this;
+        console.time(self.fullName);
+        param = param || {};
+        if (!param.__seq) param.__seq = ++seq;
+
+        self.getData(function(data, partials){
+          self.getTemplate(function(template){
+            self.render(data, partials, template, function() {
+              self.afterRender(function(){
+                self.rendered = true;
+                self.myselfLoaded(function(){
+                  self.loadChildren(function(){
+                    self.allLoaded(function(){
+                      console.timeEnd(self.fullName);
+                      if (callback) callback();
+                    }, param);
+                  }, param);
+                }, param);
+              }, param);
+            }, param);
+          }, param);
+        }, param);
+      };
+    })(),
+
+    getData: __defaultLoadHandler,
+    getTemplate: function(callback, param) {
       var self = this;
-      if (self.template) return callback();
-      self.F.getTemplate(self.templateName || self.name, function(template){
-        self.template = template;
-        callback();
-      });
-    };
-    Component.render = function(callback, param){
-      var contents = this.F.Template.Render(this.template, param.data, param.partials);
-      this.$container.html(contents);
-      callback();
-    };
-    Component.afterRender = null;
-    Component.myselfLoaded = function(callback){
-      this.rendered = true;
-      while (this.earlyRecieved.length > 0) {
-        this.earlyRecieved.pop()();
+      if (self.template) {
+        return callback(self.template);
       }
-      this.publish(namespace.TOPIC.COMPONENT_LOADED_MYSELF);
-      callback();
-    };
-    Component.loadChildren = function(callback, param){
+      var templateName = self.templateName || self.name;
+      self.F.getTemplate(templateName, function(template){
+        self.template = template;
+        callback(self.template);
+      });
+    },
+    render: function(data, partials, template, callback, param){
       var self = this;
-      var components = self.$(ComponentFilter);
-      var len = components.length;
+      var contents = self.F.render(template, data, partials);
+      self.$container.html(contents);
+      callback();
+    },
+    afterRender: __defaultLoadHandler,
+    myselfLoaded: function(callback, param){
+      var earlyRecieved = this.earlyRecieved;
+      while (earlyRecieved.length > 0) {
+        earlyRecieved.pop()();
+      }
+      callback();
+    },
+    loadChildren: function(callback, param){
+      var self = this;
+      var els = self.$("[" + COMPONENT_ATTR + "]");
+      var len = els.length;
       if (!len) {
-        self.publish(namespace.TOPIC.COMPONENT_LOADED_CHILDREN);
         if (callback) callback();
         return;
       }
-      namespace.forEachAsync(components, function(container, cb){
+
+      forEachAsync(els, function(container, cb){
         var $container = $(container);
-        var name = $container.data('name');
-        self.F.getComponentClass(name, function(componentClass, name, env){
-          var c = new componentClass(name, $container, env);
-          c.load(param, cb);
+        var fullName = $container.attr(COMPONENT_ATTR);
+        self.F.requireComponent(fullName, function(constructor, name, env){
+          if (!isClass(constructor, COMPONENT)) {
+            throw new Error("not component class: " + env.name + ":" + name);
+          }
+          var c = new constructor(name, $container, env);
+          (function(c, cb){
+            setImmediate(function(){
+              c.load(param, cb);
+            });
+          })(c, cb);
         });
       }, function(){
-        self.publish(namespace.TOPIC.COMPONENT_LOADED_CHILDREN);
         if (callback) callback();
       })
     },
-    Component.allLoaded = null;
-    Component.unload = function(){ this.unsubscribe(); };
+    allLoaded: __defaultLoadHandler,
+    unload: function(){
+      console.debug("unload called", this.fullName);
+      this.unsubscribe();
+    },
 
-    Component.require = function(name, options, callback) { this.F.require(name, options, callback); };
-    Component.publish = function(topic, data) { namespace.Pubsub.publish(topic, data, this); };
-    Component.subscribe = function(topic, callback){
+    publish: function(topic, data) {
+      pubsub.publish(topic, data, this);
+    },
+    subscribe: function(topic, callback){
       var self = this;
-      self.subscribeList[topic] = namespace.Pubsub.subscribe(topic, function(topic, data, from){
-        if (self.rendered) callback(topic, data, from);
-        else self.earlyRecieved.push(function(){ callback(topic, data, from); });
+      self.subscribeList[topic] = pubsub.subscribe(topic, function(topic, data, from){
+        if (self.rendered) {
+          callback(topic, data, from);
+        } else {
+          self.earlyRecieved.push(function(){ callback(topic, data, from); });
+        }
       });
-    };
-    Component.unsubscribe = function(topic) {
+    },
+    unsubscribe: function(topic) {
+      var list = this.subscribeList;
       if (!topic) {
-        for (var i in this.subscribeList) namespace.Pubsub.unsubscribe(i, this.subscribeList[i]);
+        for (var i in list) pubsub.unsubscribe(i, list[i]);
       } else {
-        if (topic in this.subscribeList) namspace.Pubsub.unsubscribe(topic, this.subscribeList[topic]);
+        if (topic in list) pubsub.unsubscribe(topic, list[topic]);
       }
-    };
+    },
+  });
 
-    return Class.extend(Component);
-  })();
-})(window.F.__);
+})();
 

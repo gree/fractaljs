@@ -1,7 +1,0 @@
-F({
-  Prefix: {
-    Component: '/',
-    Template: '/',
-  }
-});
-

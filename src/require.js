@@ -1,74 +1,90 @@
-(function(namespace){
-  namespace.ObjectLoader = (function(){
-    var data = null;
-    var queue = [];
+(function(namespace){ // dev
 
-    var lock = {
-      get: function(){
-        if (!data) {
-          data = {};
-          return true;
-        }
-        return false;
-      },
-      release: function(){ data = null; }
+  // import
+  var ClassType = namespace.ClassType, // dev
+  createAsyncOnce = namespace.createAsyncOnce; // dev
+
+  var ObjectLoader = (function(){
+    var data = null,
+    dataOwner = null,
+    refCount = 0,
+    queue = [];
+
+    var release = function(name){
+      if (name !== dataOwner) return false;
+      --refCount;
+      var refCopy = data;
+      data = {};
+      if (refCount === 0) {
+        console.debug("release done", dataOwner);
+        dataOwner = null;
+        refCount = 0;
+      }
+      return refCopy;
     };
 
-    var lockedCall = function(func) {
-      if (!lock.get()) {
-        queue.push(func);
-        return false;
-      } else {
-        func(function(){
-          lock.release();
-          if (queue.length) {
-            lockedCall(queue.shift());
-          }
-        });
+    var lock = function(name) {
+      if (!dataOwner || dataOwner === name) {
+        dataOwner = name;
+        ++refCount;
+        data = {};
+        console.debug("lock", dataOwner, refCount);
         return true;
+      } else {
+        return false;
       }
     };
 
+    var asyncOnce = createAsyncOnce();
+
+    var main = function(name, url, callback) {
+      console.debug("loadObjects", name, url);
+      if (lock(name)) {
+        require(url, function(){
+          var data = release(name);
+          if (queue.length) queue.shift()();
+          callback(data);
+        });
+      } else {
+        queue.push(function(){
+          main(name, url, callback);
+        });
+      }
+    };
+
+    var load =  function(name, url, callback) {
+      asyncOnce(url, function(cb){
+        main(name, url, function(data){
+          cb(function(cb){ cb(data); });
+        });
+      }, callback);
+    };
+
     return {
-      component: {
-        define: function(name, constructor) {
-          data.components[name] = constructor;
-        },
-        load: function(url, callback) {
-          var res = lockedCall(function(lockedCallback){
-            data.components = {};
-            namespace.require(url, function(){
-              var components = data.components;
-              lockedCallback();
-              callback(components);
-            });
-          });
-          console.debug("lockedCall", url, res);
-        },
+      define: function(name, constructor) {
+        data[name] = constructor;
       },
-      config: {
-        define: function(config) {
-          data.config = config;
-        },
-        load: function(url, callback) {
-          lockedCall(function(lockedCallback){
-            namespace.require(url, function(){
-              var config = data.config;
-              lockedCallback();
-              callback(config);
-            });
-          });
-        },
+      requireComponent: function(envName, url, callback) {
+        load(ClassType.COMPONENT + "." + envName, url, callback);
+      },
+      requireEnv: function(url, callback) {
+        load(ClassType.ENV, url, callback);
       },
     };
   })();
 
-  namespace.require = (function(){
+  var require = (function(){
+    var KNOWN_TYPES = {js:1, css:1, tmpl:1};
+    var getResourceType = function(name) {
+      var type = name.split(".").pop();
+      return (type in KNOWN_TYPES) ? type : "tmpl";
+    };
+
     var byAddingElement = function(element, callback) {
       var done = false;
       element.onload = element.onreadystatechange = function(){
-        if ( !done && (!this.readyState ||
-                       this.readyState == "loaded" || this.readyState == "complete") ) {
+        var state = this.readyState;
+        if ( !done && (!state || state == "loaded" || state == "complete") ) {
           done = true;
           callback(false, true);
           element.onload = element.onreadystatechange = null;
@@ -77,21 +93,23 @@
       var container = document.getElementsByTagName("head")[0];
       container.appendChild(element);
     };
+
     var byAjax = function(url, callback){
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
       xhr.onreadystatechange = function(){
         if (xhr.readyState === 4) {
-          var err, data;
-          if ((xhr.status === 200 || xhr.status === 0) && xhr.responseText) {
-            callback(false, xhr.responseText);
+          var err, data, status = xhr.status, res = xhr.responseText;
+          if ((status === 200 || status === 0) && res) {
+            callback(false, res);
           } else {
-            callback("unexpected server resposne: " + xhr.status);
+            callback("unexpected server resposne: " + status);
           }
         }
       }
       xhr.send("");
     };
+
     var Type2Getter = {
       "js": function(url, callback) {
         var el = document.createElement("script");
@@ -107,62 +125,38 @@
       },
       "tmpl": byAjax
     };
-    var singleRequire = (function(){
-      var listeners = {};
+
+    return (function(){
       var cache = {};
+      var asyncOnce = createAsyncOnce();
 
-      var releaseListeners = function(resource, data) {
-        listeners[resource.url].forEach(function(v){
-          v(data, resource.id);
-        });
-        delete listeners[resource.url];
-      };
-
-      return function(resource, callback) {
-        if (resource.url in cache) {
-          callback(cache[resource.url], resource.id);
-          return;
-        }
-        if (resource.url in listeners) {
-          listeners[resource.url].push(callback);
-          return;
-        }
-
-        var timeout = setTimeout(function(){
-          console.error('Require timeout: ' + resource.url);
-          releaseListeners(resource);
-        }, 10000);
-        listeners[resource.url] = [callback];
-        Type2Getter[resource.type](resource.url, function(err, data) {
-          clearTimeout(timeout);
+      var main = function(url, callback) {
+        var type = getResourceType(url);
+        console.log("network require", url)
+        Type2Getter[type](url, function(err, data) {
           if (err) {
             console.error('Require error: ' + err);
-          } else {
-            cache[resource.url] = data;
           }
-          releaseListeners(resource, data);
+          cache[url] = data;
+          callback(data);
         });
       };
-    })();
 
-    return function(resourceList, callback) {
-      if (!Array.isArray(resourceList)) {
-        return singleRequire(resourceList, callback);
-      }
-      var retData = {};
-      namespace.forEachAsync(
-        resourceList,
-        function(v, cb){
-          singleRequire(v, function(data, id){
-            retData[id] = data;
-            cb();
-          });
-        },
-        function(){
-          callback(retData);
+      return function(url, callback) {
+        if (url in cache) {
+          return callback(cache[url]);
         }
-      );
-    };
+        asyncOnce(url, function(cb){
+          main(url, function(data){
+            cb(function(cb){ cb(data); });
+          });
+        }, callback);
+      };
+    })();
   })();
-})(window.F.__);
+
+  namespace.ObjectLoader = ObjectLoader; // dev
+  namespace.require = require; // dev
+
+})(F.__); // dev
 

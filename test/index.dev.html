@@ -4,21 +4,31 @@
     <title>FractalJS App</title>
   </head>
   <body>
-    <div data-role="component" data-name="main"></div>
+    <div f-component="main"></div>
 
     <script type="text/javascript" src="../src/interface.js"></script>
+    <script type="text/javascript" src="../src/utils.js"></script>
     <script type="text/javascript" src="../src/require.js"></script>
     <script type="text/javascript" src="../src/pubsub.js"></script>
     <script type="text/javascript" src="../src/env.js"></script>
     <script type="text/javascript" src="../src/component.js"></script>
+    <script type="text/javascript" src="../experimental/app.js"></script>
+    <script type="text/javascript" src="../experimental/data.js"></script>
     <script type="text/javascript">
-      var config = {
+      var env = new (F.Env.extend({
         Envs: {
-          font: 'font/',
-          color: 'color/index.js'
-        }
-      };
-      F.construct(config);
+          namespace: "namespace/config.js",
+          recursive: "recursive/",
+          list: "list/",
+          require: "require/config.js",
+          template: "template/",
+          history: "history/",
+
+          // using experimentals
+          data: "data/",
+        },
+      }))("local");
+      F.init(env);
     </script>
   </body>
 </html>
