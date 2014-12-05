@@ -1,5 +1,27 @@
 (function(namespace){ // dev
 
+  var setImmediate = (function() {
+    var timeouts = [];
+    var messageName = "F.setImmediate";
+
+    function handleMessage(event) {
+      if (event.source == window && event.data == messageName) {
+        event.stopPropagation();
+        if (timeouts.length > 0) {
+          var fn = timeouts.shift();
+          fn();
+        }
+      }
+    }
+    window.addEventListener("message", handleMessage, true);
+
+    return function(fn) {
+      timeouts.push(fn);
+      window.postMessage(messageName, "*");
+    };
+  })();
+
+
   var forEachAsync = function(items, fn, done) {
     var count, left;
     count = left = items.length;
@@ -94,6 +116,7 @@
   namespace.createClass = createClass; // dev
   namespace.isClass = isClass; // dev
   namespace.ClassType = ClassType; // dev
+  namespace.setImmediate = setImmediate; // dev
 
 })(F.__); // dev
 

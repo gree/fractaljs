@@ -1,7 +1,6 @@
 (function(global){ // dev
 
-  var namespace = {}; // dev
-  var ready = false, listeners = [];
+  var namespace = {}, ready = false, listeners = [];
 
   var F = global.F = function(arg1, arg2){
     var ObjectLoader = namespace.ObjectLoader; // dev
@@ -21,7 +20,7 @@
       return;
     }
     if (ready) {
-      callback();
+      callback(namespace);
     } else {
       listeners.push(callback);
     }
@@ -29,8 +28,10 @@
 
   F.__ = namespace; // dev
 
-  F.construct = function(env, callback){
-    console.time("F.construct");
+  F.init = function(env, callback){
+    F.init = function(){};
+
+    console.time("F.init");
     if (typeof(env) === "function") {
       callback = env;
       env = null;
@@ -40,7 +41,7 @@
       ready = true;
       var i = 0, len = listeners.length;
       for (; i < len; ++i) {
-        listeners[i]();
+        listeners[i](namespace);
       }
       listeners = [];
 

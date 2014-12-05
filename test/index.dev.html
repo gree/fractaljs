@@ -12,7 +12,8 @@
     <script type="text/javascript" src="../src/pubsub.js"></script>
     <script type="text/javascript" src="../src/env.js"></script>
     <script type="text/javascript" src="../src/component.js"></script>
-    <script type="text/javascript" src="../src/app.js"></script>
+    <script type="text/javascript" src="../experimental/app.js"></script>
+    <script type="text/javascript" src="../experimental/data.js"></script>
     <script type="text/javascript">
       var env = new (F.Env.extend({
         Envs: {
@@ -20,11 +21,14 @@
           recursive: "recursive/",
           list: "list/",
           require: "require/config.js",
-          history: "history/",
           template: "template/",
+          history: "history/",
+
+          // using experimentals
+          data: "data/",
         },
       }))("local");
-      F.construct(env);
+      F.init(env);
     </script>
   </body>
 </html>

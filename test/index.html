@@ -7,7 +7,7 @@
     <div f-component="main"></div>
 
     <script type="text/javascript" src="../dist/fractal.js"></script>
-    <script type="text/javascript" src="../dist/fractal.app.js"></script>
+    <script type="text/javascript" src="../experimental/app.js"></script>
     <script type="text/javascript">
       var env = new (F.Env.extend({
         Envs: {
@@ -15,11 +15,10 @@
           recursive: "recursive/",
           list: "list/",
           require: "require/config.js",
-          history: "history/",
           template: "template/",
         },
       }))("local");
-      F.construct(env);
+      F.init(env);
     </script>
   </body>
 </html>

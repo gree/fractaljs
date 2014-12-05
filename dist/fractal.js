@@ -3,7 +3,7 @@
 
 // Source: src/interface.js
 
-  var ready = false, listeners = [];
+  var namespace = {}, ready = false, listeners = [];
 
   var F = global.F = function(arg1, arg2){
 
@@ -21,14 +21,16 @@
       return;
     }
     if (ready) {
-      callback();
+      callback(namespace);
     } else {
       listeners.push(callback);
     }
   };
 
 
-  F.construct = function(env, callback){
+  F.init = function(env, callback){
+    F.init = function(){};
+
     if (typeof(env) === "function") {
       callback = env;
       env = null;
@@ -38,7 +40,7 @@
       ready = true;
       var i = 0, len = listeners.length;
       for (; i < len; ++i) {
-        listeners[i]();
+        listeners[i](namespace);
       }
       listeners = [];
 
@@ -55,6 +57,28 @@
 
 
 // Source: src/utils.js
+
+  var setImmediate = (function() {
+    var timeouts = [];
+    var messageName = "F.setImmediate";
+
+    function handleMessage(event) {
+      if (event.source == window && event.data == messageName) {
+        event.stopPropagation();
+        if (timeouts.length > 0) {
+          var fn = timeouts.shift();
+          fn();
+        }
+      }
+    }
+    window.addEventListener("message", handleMessage, true);
+
+    return function(fn) {
+      timeouts.push(fn);
+      window.postMessage(messageName, "*");
+    };
+  })();
+
 
   var forEachAsync = function(items, fn, done) {
     var count, left;
@@ -594,7 +618,8 @@ F.Component = (function(){
   var pubsub = F.Pubsub,
   COMPONENT = ClassType.COMPONENT,
   COMPONENT_ATTR = "f-component",
-  __defaultLoadHandler = function(callback, param) { callback(); };
+  __defaultLoadHandler = function(callback, param) { callback(); },
+  idSeq = 0;
 
   return createClass(COMPONENT).extend({
     init: function(name, $container, env){
@@ -603,10 +628,10 @@ F.Component = (function(){
       self.$container = $container;
       self.F = env;
       self.fullName = self.F.name + ":" + name;
+      self.id = ++idSeq;
 
       self.$ = self.$container.find.bind(self.$container);
-      var resetDisplay = self.$container.attr("f-display");
-      if (resetDisplay) self.$container.css("display", resetDisplay);
+      if (self.resetDisplay) self.$container.css("display", self.resetDisplay);
       self.$container.on("destroyed", self.unload.bind(self));
 
       self.rendered = false;
@@ -635,43 +660,49 @@ F.Component = (function(){
       }
       self.publish(methodName, data, self);
     },
-    load: function(param, callback){
-      var self = this;
-      param = param || {};
-      self.getData(function(data, partials){
-        self.getTemplate(function(){
-          self.render(data, partials, function() {
-            self.afterRender(function(){
-              self.rendered = true;
-              self.myselfLoaded(function(){
-                self.loadChildren(function(){
-                  self.allLoaded(function(){
-                    console.timeEnd(self.fullName);
-                    if (callback) callback();
+    load: (function(){
+      var seq = 0;
+
+      return function(param, callback){
+        var self = this;
+        param = param || {};
+        if (!param.__seq) param.__seq = ++seq;
+
+        self.getData(function(data, partials){
+          self.getTemplate(function(template){
+            self.render(data, partials, template, function() {
+              self.afterRender(function(){
+                self.rendered = true;
+                self.myselfLoaded(function(){
+                  self.loadChildren(function(){
+                    self.allLoaded(function(){
+                      console.timeEnd(self.fullName);
+                      if (callback) callback();
+                    }, param);
                   }, param);
                 }, param);
               }, param);
             }, param);
           }, param);
         }, param);
-      }, param);
-    },
+      };
+    })(),
 
     getData: __defaultLoadHandler,
     getTemplate: function(callback, param) {
       var self = this;
       if (self.template) {
-        return callback();
+        return callback(self.template);
       }
       var templateName = self.templateName || self.name;
       self.F.getTemplate(templateName, function(template){
         self.template = template;
-        callback();
+        callback(self.template);
       });
     },
-    render: function(data, partials, callback, param){
+    render: function(data, partials, template, callback, param){
       var self = this;
-      var contents = self.F.render(self.template, data, partials);
+      var contents = self.F.render(template, data, partials);
       self.$container.html(contents);
       callback();
     },
@@ -700,7 +731,11 @@ F.Component = (function(){
             throw new Error("not component class: " + env.name + ":" + name);
           }
           var c = new constructor(name, $container, env);
-          c.load(param, cb);
+          (function(c, cb){
+            setImmediate(function(){
+              c.load(param, cb);
+            });
+          })(c, cb);
         });
       }, function(){
         if (callback) callback();

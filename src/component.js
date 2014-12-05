@@ -5,11 +5,13 @@ F.Component = (function(){
   var ClassType = namespace.ClassType; // dev
   var createClass = namespace.createClass; // dev
   var forEachAsync = namespace.forEachAsync; // dev
+  var setImmediate = namespace.setImmediate; // dev
 
   var pubsub = F.Pubsub,
   COMPONENT = ClassType.COMPONENT,
   COMPONENT_ATTR = "f-component",
-  __defaultLoadHandler = function(callback, param) { callback(); };
+  __defaultLoadHandler = function(callback, param) { callback(); },
+  idSeq = 0;
 
   return createClass(COMPONENT).extend({
     init: function(name, $container, env){
@@ -18,10 +20,10 @@ F.Component = (function(){
       self.$container = $container;
       self.F = env;
       self.fullName = self.F.name + ":" + name;
+      self.id = ++idSeq;
 
       self.$ = self.$container.find.bind(self.$container);
-      var resetDisplay = self.$container.attr("f-display");
-      if (resetDisplay) self.$container.css("display", resetDisplay);
+      if (self.resetDisplay) self.$container.css("display", self.resetDisplay);
       self.$container.on("destroyed", self.unload.bind(self));
 
       self.rendered = false;
@@ -50,44 +52,50 @@ F.Component = (function(){
       }
       self.publish(methodName, data, self);
     },
-    load: function(param, callback){
-      var self = this;
-      console.time(self.fullName);
-      param = param || {};
-      self.getData(function(data, partials){
-        self.getTemplate(function(){
-          self.render(data, partials, function() {
-            self.afterRender(function(){
-              self.rendered = true;
-              self.myselfLoaded(function(){
-                self.loadChildren(function(){
-                  self.allLoaded(function(){
-                    console.timeEnd(self.fullName);
-                    if (callback) callback();
+    load: (function(){
+      var seq = 0;
+
+      return function(param, callback){
+        var self = this;
+        console.time(self.fullName);
+        param = param || {};
+        if (!param.__seq) param.__seq = ++seq;
+
+        self.getData(function(data, partials){
+          self.getTemplate(function(template){
+            self.render(data, partials, template, function() {
+              self.afterRender(function(){
+                self.rendered = true;
+                self.myselfLoaded(function(){
+                  self.loadChildren(function(){
+                    self.allLoaded(function(){
+                      console.timeEnd(self.fullName);
+                      if (callback) callback();
+                    }, param);
                   }, param);
                 }, param);
               }, param);
             }, param);
           }, param);
         }, param);
-      }, param);
-    },
+      };
+    })(),
 
     getData: __defaultLoadHandler,
     getTemplate: function(callback, param) {
       var self = this;
       if (self.template) {
-        return callback();
+        return callback(self.template);
       }
       var templateName = self.templateName || self.name;
       self.F.getTemplate(templateName, function(template){
         self.template = template;
-        callback();
+        callback(self.template);
       });
     },
-    render: function(data, partials, callback, param){
+    render: function(data, partials, template, callback, param){
       var self = this;
-      var contents = self.F.render(self.template, data, partials);
+      var contents = self.F.render(template, data, partials);
       self.$container.html(contents);
       callback();
     },
@@ -116,7 +124,11 @@ F.Component = (function(){
             throw new Error("not component class: " + env.name + ":" + name);
           }
           var c = new constructor(name, $container, env);
-          c.load(param, cb);
+          (function(c, cb){
+            setImmediate(function(){
+              c.load(param, cb);
+            });
+          })(c, cb);
         });
       }, function(){
         if (callback) callback();

@@ -1,5 +1,4 @@
 module.exports = function (grunt) {
-
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
 
@@ -34,22 +33,16 @@ module.exports = function (grunt) {
       },
       dist: {
         src: [
-          'src/__head__.js',
+          'misc/__head__.js',
           'src/interface.js',
           'src/utils.js',
           'src/require.js',
           'src/pubsub.js',
           'src/env.js',
           'src/component.js',
-          'src/__foot__.js',
+          'misc/__foot__.js',
         ],
         dest: 'dist/fractal.js'
-      },
-      app: {
-        src: [
-          'src/app.js'
-        ],
-        dest: 'dist/fractal.app.js',
       },
     },
 
