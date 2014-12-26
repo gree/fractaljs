@@ -1,19 +1,15 @@
-F("testItem", F.Component.extend({
+F.component("testItem", {
   getData: function(cb) {
     cb({name: F.app.query.name});
   }
-}));
+});
 
-F("testBody", F.app.Router.extend({
+F.component("testBody", {
   getDefaultName: function() {
-    if (F.app.query.name) return F.app.query.name + ":main";
-    return "namespace:main";
+    return F.app.query.name || "list";
   },
   getComponentName: function(changed, cb) {
-    if (changed.name) {
-      cb(F.app.query.name + ":main");
-    } else {
-      cb();
-    }
+    cb(changed.name ? F.app.query.name : null);
   },
-}));
+}, F.app.Router);
+

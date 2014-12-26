@@ -1,0 +1,29 @@
+<div f-component="inside_component">inside_component NG</div>
+
+<div f-component="external_file">external_file NG</div>
+
+<div f-component="inside_dom">inside_dom NG</div>
+
+<div f-component="external_file_name">external_file_name NG</div>
+
+<div f-component="inside_dom_name">inside_dom_name NG</div>
+
+<div f-component="nested">nested NG</div>
+
+<div f-component="partial">partial NG</div>
+
+{{=<% %>=}}
+
+<template name="template_inside_dom">
+  <span>{{name}} OK</span>
+</template>
+
+<template name="template_inside_dom_other_name">
+  <span>{{name}} OK</span>
+</template>
+
+<template name="template_partial_inside_dom">
+  partial_inside_dom {{a}} OK
+</template>
+
+<%={{ }}=%>
