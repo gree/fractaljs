@@ -1,4 +1,4 @@
-F(function(){
+F(function(ns){
   var app = F.app = {};
   var PageKey = "page";
 
@@ -57,7 +57,7 @@ F(function(){
     var triggerStateChange = function(url){
       var changed = parseUrl(url);
       for (var i in changed) {
-        F.Pubsub.publish("app.query.changed", changed);
+        ns.Pubsub.publish("app.query.changed", changed);
         break;
       }
     }
@@ -78,10 +78,9 @@ F(function(){
       // }
       triggerStateChange(window.location.href);
     };
-
   })();
 
-  app.Router = F.Component.extend({
+  app.Router = F.ComponentBase.extend({
     getDefaultName: function() { throw new Error("to be extended"); },
     getComponentName: function(changedQuery, callback) { throw new Error("to be extended"); },
     template: '{{#name}}<div f-component="{{name}}" />{{/name}}',
@@ -90,7 +89,7 @@ F(function(){
       self._super(name, $container, env);
       self.componentName = self.getDefaultName();
       self.subscribe("app.query.changed", function(topic, data){
-        console.debug("received", self.fullName, topic, data);
+        console.debug("received", self.name, topic, data);
         self.getComponentName(data, function(componentName){
           if (componentName && self.componentName !== componentName) {
             self.componentName = componentName;

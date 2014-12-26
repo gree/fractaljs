@@ -1,4 +1,3 @@
-// Source: src/fractal.js
 (function(global){
   var setImmediate = (function() {
     var timeouts = [];
@@ -155,6 +154,7 @@
     return {
       publish: function(topic, data, from) {
         if (!topics[topic]) {
+          console.debug("stock message", topic, (from && from.name) || "", data);
           stock.add(topic, {d: data, f: from});
           return;
         }
@@ -162,6 +162,7 @@
         for (var i in subscribers) subscribers[i].cb(topic, data, from);
       },
       subscribe: function(topic, callback) {
+        console.debug("subscribe", topic);
         if (!topics[topic]) topics[topic] = [];
         var token = ++seq;
         topics[topic].push({
@@ -170,11 +171,13 @@
         });
         var data = stock.get(topic);
         if (data) {
+          console.debug("get from stock", topic, data.f, data.d);
           callback(topic, data.d, data.f);
         }
         return token;
       },
       unsubscribe: function(topic, token) {
+        console.debug("unsubscribe", topic);
         if (!(topic in topics)) return;
         var subscribers = topics[topic];
         for (var i in subscribers) {
@@ -234,6 +237,7 @@
     var getMethod = function(name) { return _methods[name.split(".").pop()] || _methods.ajax; };
 
     var main = function(url, cb) {
+      console.log("network require", url)
       getMethod(url)(url, function(err, data) {
         if (err) {
           console.error('Require error: ' + err);
@@ -358,6 +362,7 @@
     },
     load: function(param, callback){
       var self = this;
+      console.time("Component." + self.name + self.id);
       param = param || {};
 
       self.getData(function(data, partials){
@@ -433,6 +438,7 @@
     },
     allLoaded: __noImpl,
     unload: function(){
+      console.debug("unload called", this.name);
       this.unsubscribe();
     },
 
@@ -444,6 +450,7 @@
           callback(topic, data, from);
         } else {
           self.buffered.push(function(){
+            console.debug(self.name, "recieved before render",  topic, data, from);
             callback(topic, data, from);
           });
         }
@@ -477,6 +484,7 @@
   F.ComponentBase = Component;
 
   F.component = function(name, object, base) {
+    console.debug("register component class", name);
     components[name] = (base || Component).extend(object || {});
   };
 
@@ -495,6 +503,7 @@
       for (; i<len; ++i) initCbq[i](namespace);
       initCbq = [];
 
+      console.time("build");
       var c = new Component("", $(global.document), env);
       c.loadChildren(function(){
         console.timeEnd("build");

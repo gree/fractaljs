@@ -5,7 +5,7 @@ module.exports = function (grunt) {
     connect: {
       server: {
         options: {
-          port: 9000,
+          port: 9010,
           keepalive: true,
         }
       }
@@ -33,14 +33,7 @@ module.exports = function (grunt) {
       },
       dist: {
         src: [
-          'misc/__head__.js',
-          'src/interface.js',
-          'src/utils.js',
-          'src/require.js',
-          'src/pubsub.js',
-          'src/env.js',
-          'src/component.js',
-          'misc/__foot__.js',
+          'src/fractal.js',
         ],
         dest: 'dist/fractal.js'
       },
