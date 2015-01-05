@@ -9,9 +9,8 @@
     <script type="text/javascript" src="../src/fractal.js"></script>
     <script type="text/javascript" src="../experimental/app.js"></script>
     <script type="text/javascript">
-      F.init({
-        prefixComponent: "components",
-        prefixTemplate: "templates",
+      F.createEnv(function(env){
+        env.build();
       });
     </script>
   </body>

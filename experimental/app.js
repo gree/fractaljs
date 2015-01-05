@@ -1,4 +1,4 @@
-F(function(ns){
+(function(){
   var app = F.app = {};
   var PageKey = "page";
 
@@ -57,7 +57,7 @@ F(function(ns){
     var triggerStateChange = function(url){
       var changed = parseUrl(url);
       for (var i in changed) {
-        ns.Pubsub.publish("app.query.changed", changed);
+        F.Pubsub.publish("app.query.changed", changed);
         break;
       }
     }
@@ -112,5 +112,6 @@ F(function(ns){
     else if (isIOS) return "ios";
     else return "www";
   })();
-});
+
+})()
 
