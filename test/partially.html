@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Partial Build</title>
+  </head>
+  <body>
+    <h5>part 1</h5>
+
+    <div id="root" f-component="list"></div>
+
+    <h5>part 2</h5>
+    <div id="another_root">
+      <div f-component="template"></div>
+    </div>
+
+    <script type="text/javascript" src="../src/fractal.js"></script>
+    <script type="text/javascript" src="../experimental/app.js"></script>
+    <script type="text/javascript">
+      F.createInstance(function(f){
+        f.build($("#root"));
+      });
+      F.createInstance(function(f){
+        f.build($("#another_root"));
+      });
+    </script>
+  </body>
+</html>
+

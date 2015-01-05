@@ -8,9 +8,9 @@ var API = {
 
 
 var br_monitor = F.ComponentBase.extend({
-  init: function(name, $container, env) {
+  init: function(name, $container, f) {
     var self = this;
-    self._super(name, $container, env);
+    self._super(name, $container, f);
     self.subscribe("app.query.changed", function(topic, data){
       if (data.br) self.load({br: F.app.query.br});
     });

@@ -1,7 +1,7 @@
 F.component("markdown", {
   afterRender: function(cb) {
     var self = this;
-    self.env.require("//cdnjs.cloudflare.com/ajax/libs/marked/0.3.2/marked.min.js", function(){
+    self.f.require("//cdnjs.cloudflare.com/ajax/libs/marked/0.3.2/marked.min.js", function(){
       var doc = marked(self.mdData);
       self.$("#marked").html(doc);
       cb();

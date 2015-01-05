@@ -4,9 +4,9 @@ F(function(namespace){
 
   exports.Component = F.Component.extend({
     data: {},
-    init: function(name, $container, env) {
+    init: function(name, $container, f) {
       var self = this;
-      self._super(name, $container, env);
+      self._super(name, $container, f);
       self.dataCount = 0;
       for (var name in self.data) {
         registerData(name, self.data[name], self);

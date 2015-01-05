@@ -84,9 +84,9 @@
     getDefaultName: function() { throw new Error("to be extended"); },
     getComponentName: function(changedQuery, callback) { throw new Error("to be extended"); },
     template: '{{#name}}<div f-component="{{name}}" />{{/name}}',
-    init: function(name, $container, env) {
+    init: function(name, $container, f) {
       var self = this;
-      self._super(name, $container, env);
+      self._super(name, $container, f);
       self.componentName = self.getDefaultName();
       self.subscribe("app.query.changed", function(topic, data){
         console.debug("received", self.name, topic, data);

@@ -57,9 +57,9 @@ F.component("datagrid", {
 
 F.component("cell", {
   template: '<span></span>',
-  init: function(name, $container, env) {
+  init: function(name, $container, f) {
     var self = this;
-    self._super(name, $container, env);
+    self._super(name, $container, f);
     var r = $container.data("r"), c = $container.data("c"), topic = Publisher.getTopic(r, c);
     self.subscribe(topic, function(topic, data){
       self.update(data);
