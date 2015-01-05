@@ -433,7 +433,7 @@
   var defineComponentClass = function(name, object, base) {
     if (!currentEnv) throw new Error("disallowed operation");
     currentEnv.components[name] = (base || Component).extend(object || {});
-    //console.debug("register component class", name, "to env", currentEnv.id);
+    console.debug("register component class", name, "to env", currentEnv.id);
   };
 
   var requireComponentClass = (function(){

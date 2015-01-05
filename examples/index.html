@@ -9,7 +9,9 @@
     <script type="text/javascript" src="../dist/fractal.js"></script>
     <script type="text/javascript" src="../experimental/app.js"></script>
     <script type="text/javascript">
-      F.init();
+      F.createEnv(function(env){
+        env.build();
+      });
     </script>
   </body>
 </html>

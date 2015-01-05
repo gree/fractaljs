@@ -29,7 +29,7 @@ var Publisher = (function(){
 })();
 
 
-F("datagrid", F.Component.extend({
+F.component("datagrid", {
   afterRender: function(cb) {
     Publisher.start();
     cb();
@@ -52,10 +52,10 @@ F("datagrid", F.Component.extend({
     this._super();
     console.log("unloaded");
   }
-}));
+});
 
 
-F("cell", F.Component.extend({
+F.component("cell", {
   template: '<span></span>',
   init: function(name, $container, env) {
     var self = this;
@@ -72,4 +72,5 @@ F("cell", F.Component.extend({
   update: function(val){
     this.$val.text(val);
   },
-}));
+});
+

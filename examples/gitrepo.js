@@ -1,4 +1,4 @@
-F("gitrepo", F.Component.extend({}));
+F.component("gitrepo");
 
 var prefix = "https://api.github.com/repos/gree/fractaljs/";
 var API = {
@@ -7,7 +7,7 @@ var API = {
 };
 
 
-var br_monitor = F.Component.extend({
+var br_monitor = F.ComponentBase.extend({
   init: function(name, $container, env) {
     var self = this;
     self._super(name, $container, env);
@@ -20,16 +20,16 @@ var br_monitor = F.Component.extend({
   }
 });
 
-F("gitrepo_branches", F.Component.extend({
+F.component("gitrepo_branches", {
   getData: function(cb, param) {
     var self = this;
     $.get(API.branches, function(data){
       cb({branches: data});
     });
   }
-}));
+});
 
-F("gitrepo_branch_name", br_monitor.extend({
+F.component("gitrepo_branch_name", {
   template: '{{#isCurrent}}<strong>{{name}}</strong>{{/isCurrent}}' +
     '{{^isCurrent}}<a href="#gitrepo&br={{name}}">{{name}}</a>{{/isCurrent}}',
   getData: function(cb, param) {
@@ -39,9 +39,9 @@ F("gitrepo_branch_name", br_monitor.extend({
       name: this.br
     });
   }
-}));
+}, br_monitor);
 
-F("gitrepo_commits", br_monitor.extend({
+F.component("gitrepo_commits", {
   getData: function(cb, param) {
     var self = this;
     $.get(API.commits(self.getBr(param)), function(data){
@@ -52,5 +52,5 @@ F("gitrepo_commits", br_monitor.extend({
       cb({commits: data});
     });
   }
-}));
+}, br_monitor);
 

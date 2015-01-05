@@ -1,7 +1,7 @@
-F("markdown", F.Component.extend({
+F.component("markdown", {
   afterRender: function(cb) {
     var self = this;
-    self.F.require("//cdnjs.cloudflare.com/ajax/libs/marked/0.3.2/marked.min.js", function(){
+    self.env.require("//cdnjs.cloudflare.com/ajax/libs/marked/0.3.2/marked.min.js", function(){
       var doc = marked(self.mdData);
       self.$("#marked").html(doc);
       cb();
@@ -15,4 +15,4 @@ F("markdown", F.Component.extend({
       cb({raw: data});
     });
   }
-}));
+});
