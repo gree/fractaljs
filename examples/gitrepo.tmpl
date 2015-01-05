@@ -4,15 +4,13 @@
 
 {{=<% %>=}}
 
-<template id="template_gitrepo_branches">
-  <h5>BRANCHES</h5>
+<template name="template_gitrepo_branches">
   {{#branches}}
   <span f-component="gitrepo_branch_name" data-br="{{name}}"></span>
   {{/branches}}
 </template>
 
-<template id="template_gitrepo_commits">
-  <h5>COMMITS</h5>
+<template name="template_gitrepo_commits">
   <ul>
     {{#commits}}
     <li>

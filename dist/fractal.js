@@ -37,11 +37,11 @@
 
   var createAsyncOnce = function(){
     var listeners = {};
-    return function(key, fn, callback) {
+    return function(key, fn, cb) {
       if (key in listeners) {
-        listeners[key].push(callback);
+        listeners[key].push(cb);
       } else {
-        listeners[key] = [callback];
+        listeners[key] = [cb];
         fn(function(f){
           var q = listeners[key], count = q.length;
           delete listeners[key];
@@ -51,127 +51,20 @@
     }
   };
 
-  var createClass = function(type){
-    /* Simple JavaScript Inheritance
-     * By John Resig http://ejohn.org/
-     * MIT Licensed.
-     */
-    // Inspired by base2 and Prototype
-    var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
-    var Class = function(){};
-    Class.extend = function(prop) {
-      var _super = this.prototype;
-
-      initializing = true;
-      var prototype = new this();
-      initializing = false;
-
-      for (var name in prop) {
-        prototype[name] = typeof prop[name] == "function" &&
-          typeof _super[name] == "function" && fnTest.test(prop[name]) ?
-          (function(name, fn){
-            return function() {
-              var tmp = this._super;
-              this._super = _super[name];
-
-              var ret = fn.apply(this, arguments);
-              this._super = tmp;
-
-              return ret;
-            };
-          })(name, prop[name]) :
-        prop[name];
-      }
-
-      var Class = function(){
-        if ( !initializing && this.init )
-          this.init.apply(this, arguments);
-      }
-
-      Class.prototype = prototype;
-      Class.prototype.constructor = Class;
-
-      Class.extend = arguments.callee;
-      Class.getType = function() { return type; };
-      return Class;
-    };
-
-    return Class;
-  };
-
-  var isClass = function(object, type) {
-    if (!object.getType) return false;
-    return (!type) || (object.getType() === type);
-  };
-
-  var ClassType = {
-    COMPONENT: 1,
-    ENV: 2
-  };
-
   var Pubsub = (function(){
-    // TODO not important, but replace with faster implementation
-    var MaxStocked = 100;
-    var Stock = function(){
-      this.arrived = {};
-      this.buffer = {};
-    };
-    var proto = Stock.prototype;
-    proto.count = function(){
-      var count = 0;
-      for (var i in this.buffer) ++count;
-      return count;
-    };
-    proto.add = function(topic, data) {
-      var self = this;
-      if (self.count() >= MaxStocked && !(topic in self.buffer)) {
-        var oldest = new Data();
-        var oldestTopic = "";
-        for (var i in self.arrived) {
-          if (self.arrived[i] < oldest) {
-            oldest = self.arrived[i];
-            oldestTopic = i;
-          }
-        }
-        delete self.buffer[oldestTopic];
-        delete self.arrived[oldestTopic];
-      }
-      self.buffer[topic] = data;
-      self.arrived[topic] = new Date();
-    };
-    proto.get = function(topic) {
-      var self = this;
-      if (topic in self.buffer) {
-        var data = self.buffer[topic];
-        delete self.buffer[topic];
-        delete self.arrived[topic];
-        return data;
-      }
-      return null;
-    };
-
-    var topics = {}, seq = 0, stock = new Stock();
-
+    var topics = {}, seq = 0;
     return {
       publish: function(topic, data, from) {
-        if (!topics[topic]) {
-          stock.add(topic, {d: data, f: from});
-          return;
-        }
         var subscribers = topics[topic];
         for (var i in subscribers) subscribers[i].cb(topic, data, from);
       },
-      subscribe: function(topic, callback) {
+      subscribe: function(topic, cb) {
         if (!topics[topic]) topics[topic] = [];
         var token = ++seq;
         topics[topic].push({
           token: token,
-          cb: callback
+          cb: cb
         });
-        var data = stock.get(topic);
-        if (data) {
-          callback(topic, data.d, data.f);
-        }
         return token;
       },
       unsubscribe: function(topic, token) {
@@ -230,7 +123,6 @@
         xhr.send("");
       }
     };
-
     var getMethod = function(name) { return _methods[name.split(".").pop()] || _methods.ajax; };
 
     var main = function(url, cb) {
@@ -259,29 +151,34 @@
   var location = global.location,
   protocol = (location.protocol === "file:") ? "http:" : location.protocol,
   COMPONENT_ATTR = "f-component",
-  __noImpl = function(fn) { fn(); },
-  idSeq = 0;
+  TMPL_EXT = "tmpl";
 
-  var Env = createClass(ClassType.ENV).extend({
-    prefixComponent: "/",
-    prefixTemplate: "/",
-    requireList: [],
-    domParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
-    templateEngine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
-    compile: function(text) { return Hogan.compile(text) },
-    render: function(template, data, options) { return template.render(data, options); },
+  var Env = (function(){
+    var idSeq = 0;
+    var defaults = {
+      prefixComponent: "/",
+      prefixTemplate: "/",
+      requireList: [],
+      domParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
+      templateEngine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
+      compile: function(text) { return Hogan.compile(text) },
+      render: function(template, data, options) { return template.render(data, options); },
+    };
 
-    init: function(options) {
+    var Env = function(options){
       var self = this;
+      self.id = idSeq++;
+      for (var i in defaults) self[i] = defaults[i];
+      for (var i in options) self[i] = options[i];
       self.sourceRoot = self.sourceRoot || (function(url){
         return url.split("/").slice(0, -1).join("/") + "/";
       })(location.pathname);
-    },
-    resolveUrl: function(name) {
-      if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
-      return this.sourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
-    },
-    setup: function(cb) {
+
+      self.components = {};
+    };
+
+    var proto = Env.prototype;
+    proto.init = function(cb) {
       var self = this;
       self.requireList.unshift(self.domParser);
       self.requireList.unshift(self.templateEngine);
@@ -293,8 +190,30 @@
         };
         cb();
       });
-    },
-    require: function(names, cb){
+    };
+    proto.build = function($container, param, cb){
+      var self = this;
+      self.$root = $container || $(global.document);
+      var componentName = self.$root.attr(COMPONENT_ATTR);
+      if (componentName) {
+        var c = new Component(componentName, self.$root, self);
+        c.load(param, function(){
+          console.timeEnd("env.build" + self.id);
+          if (cb) cb();
+        });
+      } else {
+        var c = new Component("", self.$root, self);
+        c.loadChildren(function(){
+          console.timeEnd("env.build" + self.id);
+          if (cb) cb();
+        });
+      }
+    };
+    proto.resolveUrl = function(name) {
+      if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
+      return this.sourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
+    };
+    proto.require = function(names, cb){
       var self = this;
       if (!Array.isArray(names)) {
         var url = self.resolveUrl(names);
@@ -303,212 +222,270 @@
         var urls = names.map(function(v){ return self.resolveUrl(v); });
         forEachAsync(urls, require, cb);
       }
-    },
-    getTemplate: (function(){
-      var tmplExt = "tmpl";
-      return function(name, cb) {
-        var self = this;
-        var ext = name.split(".").pop();
-        if (ext !== tmplExt) {
-          // TOOD have to find globally ...
-          var $tmpl = $('template[name="template_' + name + '"]');
-          if ($tmpl.length > 0) {
-            return cb($tmpl.html());
-          }
-        }
-        var url = self.prefixTemplate + name + ((ext!=tmplExt) ? ("." + tmplExt) : "");
-        self.require(url, cb);
-      };
-    })(),
-    requireComponent: function(name, cb) {
+    };
+    proto.getTemplate = function(name, cb) {
       var self = this;
-      var c = getComponentByName(name);
+      var ext = name.split(".").pop();
+      if (ext !== TMPL_EXT) {
+        var $tmpl = self.$root.find('template[name="template_' + name + '"]');
+        if ($tmpl.length > 0) {
+          return cb($tmpl.html());
+        }
+      }
+      var url = self.prefixTemplate + name + ((ext!=TMPL_EXT) ? ("." + TMPL_EXT) : "");
+      self.require(url, cb);
+    };
+    proto.requireComponent = function(name, cb) {
+      var self = this;
+      var c = self.components[name];
       if (c) {
         cb(c);
       } else {
         var url = self.prefixComponent + name + ".js";
-        self.require(url, function(){
-          cb(getComponentByName(name));
+        requireComponentClass(self, url, function(){
+          cb(self.components[name]);
         });
       }
-    },
-  });
+    };
 
-  var Component = createClass(ClassType.COMPONENT).extend({
-    init: function(name, $container, env){
-      var self = this;
-      self.name = name;
-      self.$container = $container;
-      self.env = env;
-      self.id = ++idSeq;
-      self.$ = self.$container.find.bind(self.$container);
-      self.rendered = false;
-      self.subscribeList = {};
-      self.buffered = [];
-      self.templateName = self.templateName || self.name;
+    return Env;
+  })();
 
-      if (self.resetDisplay) self.$container.css("display", self.resetDisplay);
-      self.$container.on("destroyed", self.unload.bind(self));
+  var Component = (function(){
+    var Class = (function(){
+      /* Simple JavaScript Inheritance
+       * By John Resig http://ejohn.org/
+       * MIT Licensed.
+       */
+      // Inspired by base2 and Prototype
+      var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
+      var Class = function(){};
+      Class.extend = function(prop) {
+        var _super = this.prototype;
 
-      // TODO implement if needed
-      // self.children = [];
-      // self.parent = null;
-      if (typeof(self.template) === "string")
-        self.template = self.env.compile(self.template);
-    },
-    load: function(param, callback){
-      var self = this;
-      param = param || {};
+        initializing = true;
+        var prototype = new this();
+        initializing = false;
 
-      self.getData(function(data, partials){
-        self.getTemplate(function(template){
-          self.render(data, partials, template, function() {
-            self.afterRender(function(){
-              self.rendered = true;
-              self.myselfLoaded(function(){
-                self.loadChildren(function(){
-                  self.allLoaded(function(){
-                    console.timeEnd("Component." + self.name + self.id);
-                    if (callback) callback();
+        for (var name in prop) {
+          prototype[name] = typeof prop[name] == "function" &&
+            typeof _super[name] == "function" && fnTest.test(prop[name]) ?
+            (function(name, fn){
+              return function() {
+                var tmp = this._super;
+                this._super = _super[name];
+
+                var ret = fn.apply(this, arguments);
+                this._super = tmp;
+
+                return ret;
+              };
+            })(name, prop[name]) :
+          prop[name];
+        }
+
+        var Class = function(){
+          if ( !initializing && this.init )
+            this.init.apply(this, arguments);
+        }
+
+        Class.prototype = prototype;
+        Class.prototype.constructor = Class;
+
+        Class.extend = arguments.callee;
+        return Class;
+      };
+
+      return Class;
+    })();
+
+    var idSeq = 0,
+    __noImpl = function(fn) { fn(); };
+
+    return Class.extend({
+      init: function(name, $container, env){
+        var self = this;
+        self.name = name;
+        self.$container = $container;
+        self.env = env;
+        self.id = idSeq++;
+        self.$ = self.$container.find.bind(self.$container);
+        self.rendered = false;
+        self.subscribeList = {};
+        self.buffered = [];
+        self.templateName = self.templateName || self.name;
+
+        if (self.resetDisplay) self.$container.css("display", self.resetDisplay);
+        self.$container.on("destroyed", self.unload.bind(self));
+
+        // TODO implement if needed
+        // self.children = [];
+        // self.parent = null;
+        if (typeof(self.template) === "string")
+          self.template = self.env.compile(self.template);
+      },
+      load: function(param, cb){
+        var self = this;
+        param = param || {};
+
+        self.getData(function(data, partials){
+          self.getTemplate(function(template){
+            self.render(data, partials, template, function() {
+              self.afterRender(function(){
+                self.rendered = true;
+                self.myselfLoaded(function(){
+                  self.loadChildren(function(){
+                    self.allLoaded(function(){
+                      console.timeEnd("Component." + self.name + self.id);
+                      if (cb) cb();
+                    }, param);
                   }, param);
                 }, param);
               }, param);
             }, param);
           }, param);
         }, param);
-      }, param);
-    },
-    getData: __noImpl,
-    getTemplate: function(callback, param) {
-      var self = this;
-      if (self.template) {
-        callback(self.template);
-      } else {
-        self.env.getTemplate(self.templateName, function(template){
-          if (!self.template) self.template = self.env.compile(template);
-          callback(self.template);
-        });
-      }
-    },
-    render: function(data, partials, template, callback, param){
-      var self = this;
-      var contents = self.env.render(template, data, partials);
-      self.$container.html(contents);
-      callback();
-    },
-    afterRender: __noImpl,
-    myselfLoaded: function(callback, param){
-      var buffered = this.buffered;
-      while (buffered.length > 0) {
-        buffered.pop()();
-      }
-      callback();
-    },
-    loadChildren: function(callback, param){
-      var self = this;
-      var els = self.$("[" + COMPONENT_ATTR + "]");
-      var len = els.length;
-      if (!len) {
-        if (callback) callback();
-        return;
-      }
-
-      forEachAsync(els, function(container, cb){
-        var $container = $(container);
-        var componentClassName = $container.attr(COMPONENT_ATTR);
-        self.env.requireComponent(componentClassName, function(constructor){
-          var component = new constructor(componentClassName, $container, self.env);
-          (function(component, cb){
-            // NOTE
-            //  this "setImmediate" looks like the fastest implementation ...
-            //  but there is still a several ms delay comparing to just calling "component.load"
-            setImmediate(function(){
-              component.load(param, cb);
-            });
-          })(component, cb);
-        });
-      }, function(){
-        if (callback) callback();
-      })
-    },
-    allLoaded: __noImpl,
-    unload: function(){
-      this.unsubscribe();
-    },
-
-    publish: function(topic, data) { Pubsub.publish(topic, data, this); },
-    subscribe: function(topic, callback){
-      var self = this;
-      self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data, from){
-        if (self.rendered) {
-          callback(topic, data, from);
+      },
+      getData: __noImpl,
+      getTemplate: function(cb, param) {
+        var self = this;
+        if (self.template) {
+          cb(self.template);
         } else {
-          self.buffered.push(function(){
-            callback(topic, data, from);
+          self.env.getTemplate(self.templateName, function(template){
+            if (!self.template) self.template = self.env.compile(template);
+            cb(self.template);
           });
         }
-      });
-    },
-    unsubscribe: function(topic) {
-      var list = this.subscribeList;
-      if (!topic) {
-        for (var i in list) Pubsub.unsubscribe(i, list[i]);
-      } else {
-        if (topic in list) Pubsub.unsubscribe(topic, list[topic]);
+      },
+      render: function(data, partials, template, cb, param){
+        var self = this;
+        var contents = self.env.render(template, data, partials);
+        self.$container.html(contents);
+        cb();
+      },
+      afterRender: __noImpl,
+      myselfLoaded: function(cb, param){
+        var buffered = this.buffered;
+        while (buffered.length > 0) {
+          buffered.pop()();
+        }
+        cb();
+      },
+      loadChildren: function(cb, param){
+        var self = this;
+        var els = self.$("[" + COMPONENT_ATTR + "]");
+        var len = els.length;
+        if (!len) return cb();
+
+        forEachAsync(els, function(container, cb){
+          var $container = $(container);
+          var componentClassName = $container.attr(COMPONENT_ATTR);
+          self.env.requireComponent(componentClassName, function(constructor){
+            var component = new constructor(componentClassName, $container, self.env);
+            (function(component, cb){
+              // NOTE
+              //  this "setImmediate" looks like the fastest implementation ...
+              //  but there is still a several ms delay comparing to just calling "component.load"
+              setImmediate(function(){
+                component.load(param, cb);
+              });
+            })(component, cb);
+          });
+        }, cb);
+      },
+      allLoaded: __noImpl,
+      unload: function(){
+        this.unsubscribe();
+      },
+
+      publish: function(topic, data) { Pubsub.publish(topic, data, this); },
+      subscribe: function(topic, cb){
+        var self = this;
+        self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data, from){
+          if (self.rendered) {
+            cb(topic, data, from);
+          } else {
+            self.buffered.push(function(){
+              cb(topic, data, from);
+            });
+          }
+        });
+      },
+      unsubscribe: function(topic) {
+        var list = this.subscribeList;
+        if (!topic) {
+          for (var i in list) Pubsub.unsubscribe(i, list[i]);
+        } else {
+          if (topic in list) Pubsub.unsubscribe(topic, list[topic]);
+        }
+      },
+    });
+  })();
+
+  var currentEnv = null;
+  var defineComponentClass = function(name, object, base) {
+    if (!currentEnv) throw new Error("disallowed operation");
+    currentEnv.components[name] = (base || Component).extend(object || {});
+  };
+
+  var requireComponentClass = (function(){
+    var _queue = [];
+    var next = function(){
+      if (!_queue.length) return;
+      var nameDict = {};
+      var cbArray = [];
+      while(_queue.length) {
+        var task = _queue[0];
+        var env = task[0], name = task[1], cb = task[2];
+        if (!currentEnv) currentEnv = env;
+        else if (env.id != currentEnv.id) break;
+        _queue.shift();
+        nameDict[name] = true;
+        cbArray.push(cb);
       }
-    },
-  });
+      (function(cbArray){
+        var nameArray = [];
+        for (var i in nameDict) nameArray.push(i);
+        if (!nameArray.length) currentEnv = null;
+        else {
+          forEachAsync(nameArray, function(name, cb){
+            env.require(name, cb);
+          }, function(){
+            var i=0; len=cbArray.length;
+            for (; i<len; ++i) cbArray[i]();
+            currentEnv = null;
+            next();
+          });
+        }
+      })(cbArray);
+    };
 
-  var ready = false, initCbq = [], components = {}, TOPIC_ENV_CHANGED = "env.changed";
+    return function(env, name, cb){
+      _queue.push([env, name, cb]);
+      setImmediate(next);
+    };
+  })();
 
-  var getComponentByName = function(name) { return components[name] || null; };
+  (function(){
+    var F = global.F = {};
 
-  // private
-  var namespace = {};
-  namespace.getComponentByName = getComponentByName;
-  namespace.Pubsub = Pubsub;
+    F.Pubsub = Pubsub;
+    F.Env = Env;
+    F.ComponentBase = Component;
 
-  // public
-  var F = global.F = function(fn){
-    if (ready) fn(namespace);
-    else initCbq.push(fn);
-  };
-
-  F.ComponentBase = Component;
-
-  F.component = function(name, object, base) {
-    components[name] = (base || Component).extend(object || {});
-  };
-
-  F.env = function(options) {
-    var env = new Env(options);
-    env.setup(function(){
-      Pubsub.publish(TOPIC_ENV_CHANGED, env);
-    });
-  };
-
-  F.init = function(options, cb){
-    Pubsub.subscribe(TOPIC_ENV_CHANGED, function(topic, env){
-      Pubsub.unsubscribe(TOPIC_ENV_CHANGED);
-      ready = true;
-      var i=0, len=initCbq.length;
-      for (; i<len; ++i) initCbq[i](namespace);
-      initCbq = [];
-
-      var c = new Component("", $(global.document), env);
-      c.loadChildren(function(){
-        console.timeEnd("build");
-        if (cb) cb();
+    F.component = defineComponentClass;
+    F.createEnv = function(options, cb) {
+      if (typeof(options) === "function") {
+        cb = options;
+        options = {};
+      }
+      var env = new Env(options);
+      env.init(function(){
+        cb(env);
       });
-    });
-
-    if (typeof(options) === "string") {
-      var envDescriptorUrl = options;
-      require(envDescriptorUrl);
-    } else {
-      F.env(options);
-    }
-  };
+    };
+  })();
 
 })(window);
 
