@@ -1,5 +1,8 @@
 // Source: src/fractal.js
 (function(global){
+  var COMPONENT_ATTR = "f-component";
+
+  // utils
   var setImmediate = (function() {
     var timeouts = [];
     var messageName = (new Date()).getTime();
@@ -20,7 +23,6 @@
       window.postMessage(messageName, "*");
     };
   })();
-
   var forEachAsync = function(items, fn, done) {
     var count, left;
     count = left = items.length;
@@ -34,7 +36,6 @@
       }
     }
   };
-
   var createAsyncOnce = function(){
     var listeners = {};
     return function(key, fn, cb) {
@@ -80,7 +81,6 @@
       },
     };
   })();
-
   var require = (function(){
     var cache = {}, asyncOnce = createAsyncOnce();
 
@@ -147,110 +147,6 @@
       }
     };
   })();
-
-  var location = global.location,
-  protocol = (location.protocol === "file:") ? "http:" : location.protocol,
-  COMPONENT_ATTR = "f-component",
-  TMPL_EXT = "tmpl";
-
-  var Env = (function(){
-    var idSeq = 0;
-    var defaults = {
-      prefixComponent: "/",
-      prefixTemplate: "/",
-      requireList: [],
-      domParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
-      templateEngine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
-      compile: function(text) { return Hogan.compile(text) },
-      render: function(template, data, options) { return template.render(data, options); },
-    };
-
-    var Env = function(options){
-      var self = this;
-      self.id = idSeq++;
-      for (var i in defaults) self[i] = defaults[i];
-      for (var i in options) self[i] = options[i];
-      self.sourceRoot = self.sourceRoot || (function(url){
-        return url.split("/").slice(0, -1).join("/") + "/";
-      })(location.pathname);
-
-      self.components = {};
-    };
-
-    var proto = Env.prototype;
-    proto.init = function(cb) {
-      var self = this;
-      self.requireList.unshift(self.domParser);
-      self.requireList.unshift(self.templateEngine);
-      self.require(self.requireList, function(){
-        $.event.special.destroyed = {
-          remove: function(o) {
-            if (o.handler) o.handler();
-          }
-        };
-        cb();
-      });
-    };
-    proto.build = function($container, param, cb){
-      var self = this;
-      self.$root = $container || $(global.document);
-      var componentName = self.$root.attr(COMPONENT_ATTR);
-      if (componentName) {
-        var c = new Component(componentName, self.$root, self);
-        c.load(param, function(){
-          console.timeEnd("env.build" + self.id);
-          if (cb) cb();
-        });
-      } else {
-        var c = new Component("", self.$root, self);
-        c.loadChildren(function(){
-          console.timeEnd("env.build" + self.id);
-          if (cb) cb();
-        });
-      }
-    };
-    proto.resolveUrl = function(name) {
-      if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
-      return this.sourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
-    };
-    proto.require = function(names, cb){
-      var self = this;
-      if (!Array.isArray(names)) {
-        var url = self.resolveUrl(names);
-        require(url, cb);
-      } else {
-        var urls = names.map(function(v){ return self.resolveUrl(v); });
-        forEachAsync(urls, require, cb);
-      }
-    };
-    proto.getTemplate = function(name, cb) {
-      var self = this;
-      var ext = name.split(".").pop();
-      if (ext !== TMPL_EXT) {
-        var $tmpl = self.$root.find('template[name="template_' + name + '"]');
-        if ($tmpl.length > 0) {
-          return cb($tmpl.html());
-        }
-      }
-      var url = self.prefixTemplate + name + ((ext!=TMPL_EXT) ? ("." + TMPL_EXT) : "");
-      self.require(url, cb);
-    };
-    proto.requireComponent = function(name, cb) {
-      var self = this;
-      var c = self.components[name];
-      if (c) {
-        cb(c);
-      } else {
-        var url = self.prefixComponent + name + ".js";
-        requireComponentClass(self, url, function(){
-          cb(self.components[name]);
-        });
-      }
-    };
-
-    return Env;
-  })();
-
   var Component = (function(){
     var Class = (function(){
       /* Simple JavaScript Inheritance
@@ -300,14 +196,14 @@
     })();
 
     var idSeq = 0,
-    __noImpl = function(fn) { fn(); };
+    _noImpl = function(fn) { fn(); };
 
     return Class.extend({
-      init: function(name, $container, env){
+      init: function(name, $container, f){
         var self = this;
         self.name = name;
         self.$container = $container;
-        self.env = env;
+        self.f = f;
         self.id = idSeq++;
         self.$ = self.$container.find.bind(self.$container);
         self.rendered = false;
@@ -322,7 +218,7 @@
         // self.children = [];
         // self.parent = null;
         if (typeof(self.template) === "string")
-          self.template = self.env.compile(self.template);
+          self.template = self.f.compile(self.template);
       },
       load: function(param, cb){
         var self = this;
@@ -346,25 +242,25 @@
           }, param);
         }, param);
       },
-      getData: __noImpl,
+      getData: _noImpl,
       getTemplate: function(cb, param) {
         var self = this;
         if (self.template) {
           cb(self.template);
         } else {
-          self.env.getTemplate(self.templateName, function(template){
-            if (!self.template) self.template = self.env.compile(template);
+          self.f.getTemplate(self.templateName, function(template){
+            if (!self.template) self.template = self.f.compile(template);
             cb(self.template);
           });
         }
       },
       render: function(data, partials, template, cb, param){
         var self = this;
-        var contents = self.env.render(template, data, partials);
+        var contents = self.f.render(template, data, partials);
         self.$container.html(contents);
         cb();
       },
-      afterRender: __noImpl,
+      afterRender: _noImpl,
       myselfLoaded: function(cb, param){
         var buffered = this.buffered;
         while (buffered.length > 0) {
@@ -381,8 +277,8 @@
         forEachAsync(els, function(container, cb){
           var $container = $(container);
           var componentClassName = $container.attr(COMPONENT_ATTR);
-          self.env.requireComponent(componentClassName, function(constructor){
-            var component = new constructor(componentClassName, $container, self.env);
+          self.f.requireComponent(componentClassName, function(constructor){
+            var component = new constructor(componentClassName, $container, self.f);
             (function(component, cb){
               // NOTE
               //  this "setImmediate" looks like the fastest implementation ...
@@ -394,7 +290,7 @@
           });
         }, cb);
       },
-      allLoaded: __noImpl,
+      allLoaded: _noImpl,
       unload: function(){
         this.unsubscribe();
       },
@@ -423,67 +319,152 @@
     });
   })();
 
-  var currentEnv = null;
-  var defineComponentClass = function(name, object, base) {
-    if (!currentEnv) throw new Error("disallowed operation");
-    currentEnv.components[name] = (base || Component).extend(object || {});
-  };
+  (function(){
+    var currentInstance = null,
+    location = global.location,
+    protocol = (location.protocol === "file:") ? "http:" : location.protocol,
+    TMPL_EXT = "tmpl",
+    idSeq = 0,
+    defaults = {
+      prefixComponent: "/",
+      prefixTemplate: "/",
+      requireList: [],
+      domParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
+      templateEngine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
+      compile: function(text) { return Hogan.compile(text) },
+      render: function(template, data, options) { return template.render(data, options); },
+    };
 
-  var requireComponentClass = (function(){
-    var _queue = [];
-    var next = function(){
-      if (!_queue.length) return;
-      var nameDict = {};
-      var cbArray = [];
-      while(_queue.length) {
-        var task = _queue[0];
-        var env = task[0], name = task[1], cb = task[2];
-        if (!currentEnv) currentEnv = env;
-        else if (env.id != currentEnv.id) break;
-        _queue.shift();
-        nameDict[name] = true;
-        cbArray.push(cb);
-      }
-      (function(cbArray){
-        var nameArray = [];
-        for (var i in nameDict) nameArray.push(i);
-        if (!nameArray.length) currentEnv = null;
-        else {
-          forEachAsync(nameArray, function(name, cb){
-            env.require(name, cb);
-          }, function(){
-            var i=0; len=cbArray.length;
-            for (; i<len; ++i) cbArray[i]();
-            currentEnv = null;
-            next();
+    var Fractal = function(options){
+      var self = this;
+      options = options || {};
+      self.id = ++idSeq;
+      for (var i in defaults) self[i] = defaults[i];
+      for (var i in options) self[i] = options[i];
+      if (!self.sourceRoot)
+        self.sourceRoot = location.pathname.split("/").slice(0, -1).join("/") + "/";
+
+      self._classes = {};
+    };
+    Fractal.prototype = {
+      init: function(cb) {
+        var self = this;
+        var requireList = [self.domParser, self.templateEngine].concat(self.requireList);
+        self.require(requireList, function(){
+          $.event.special.destroyed = {
+            remove: function(o) {
+              if (o.handler) o.handler();
+            }
+          };
+          cb(self);
+        });
+      },
+      build: function($container, param, cb){
+        var self = this;
+        self.$root = $container || $(global.document);
+        var componentClassName = self.$root.attr(COMPONENT_ATTR);
+        if (componentClassName) {
+          self.requireComponent(componentClassName, function(constructor){
+            var c = new constructor(componentClassName, self.$root, self);
+            c.load(param, function(){
+              console.timeEnd("f.build" + self.id);
+              if (cb) cb();
+            });
+          });
+        } else {
+          var c = new Component("", self.$root, self);
+          c.loadChildren(function(){
+            console.timeEnd("f.build" + self.id);
+            if (cb) cb();
           });
         }
-      })(cbArray);
+      },
+      resolve: function(name) {
+        if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
+        return this.sourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
+      },
+      require: function(names, cb){
+        var self = this;
+        if (!Array.isArray(names)) {
+          var url = self.resolve(names);
+          require(url, cb);
+        } else {
+          var urls = names.map(function(v){ return self.resolve(v); });
+          forEachAsync(urls, require, cb);
+        }
+      },
+      getTemplate: function(name, cb) {
+        var self = this;
+        var ext = name.split(".").pop();
+        if (ext !== TMPL_EXT) {
+          var $tmpl = self.$root.find('template[name="template_' + name + '"]');
+          if ($tmpl.length > 0) {
+            return cb($tmpl.html());
+          }
+        }
+        var url = self.prefixTemplate + name + ((ext!=TMPL_EXT) ? ("." + TMPL_EXT) : "");
+        self.require(url, cb);
+      },
+      defineComponent: function(name, object, base) {
+        this._classes[name] = (base || Component).extend(object || {});
+      },
+      requireComponent: (function(){
+        var _queue = [], wip = false;
+        var next = function(){
+          if (!_queue.length) return;
+          var runArray = [];
+          while(_queue.length) {
+            var task = _queue[0];
+            if (!currentInstance) currentInstance = task.f;
+            else if (task.f.id !== currentInstance.id) break;
+            _queue.shift();
+            runArray.push(task);
+          }
+          if (!runArray.length) return;
+          else {
+            wip = true;
+            forEachAsync(runArray, function(task, cb){
+              var url = task.f.prefixComponent + task.name + ".js";
+              task.f.require(url, function(){
+                task.cb(task.f._classes[task.name]);
+                cb();
+              });
+            }, function(){
+              currentInstance = null;
+              wip = false;
+              next()
+            });
+          }
+        };
+
+        return function(name, cb) {
+          var self = this;
+          var c = self._classes[name];
+          if (c) {
+            cb(c);
+          } else {
+            var active = !!_queue.length;
+            _queue.push({ f: self, name: name, cb: cb });
+            if (!active && !wip) setImmediate(next);
+          }
+        };
+      })(),
     };
 
-    return function(env, name, cb){
-      _queue.push([env, name, cb]);
-      setImmediate(next);
-    };
-  })();
-
-  (function(){
-    var F = global.F = {};
-
-    F.Pubsub = Pubsub;
-    F.Env = Env;
-    F.ComponentBase = Component;
-
-    F.component = defineComponentClass;
-    F.createEnv = function(options, cb) {
-      if (typeof(options) === "function") {
-        cb = options;
-        options = {};
-      }
-      var env = new Env(options);
-      env.init(function(){
-        cb(env);
-      });
+    global.F = {
+      Pubsub: Pubsub,
+      ComponentBase: Component,
+      component: function(name, object, base){
+        currentInstance.defineComponent(name, object, base);
+      },
+      createInstance: function(options, cb) {
+        if (typeof(options) === "function") {
+          cb = options;
+          options = null;
+        }
+        var f = new Fractal(options);
+        f.init(cb);
+      },
     };
   })();
 
