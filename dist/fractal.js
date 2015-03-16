@@ -397,7 +397,7 @@
         var self = this;
         var ext = name.split(".").pop();
         if (ext !== TMPL_EXT) {
-          var $tmpl = self.$root.find('template[name="template_' + name + '"]');
+          var $tmpl = self.$root.find('script[name="template_' + name + '"]');
           if ($tmpl.length > 0) {
             return cb($tmpl.html());
           }
