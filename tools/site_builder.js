@@ -3,12 +3,22 @@ var system = require('system');
 
 var args = system.args;
 var options = {};
-for (var i = 0; i < args.length - 1; i++) {
+var options = {
+  concurrency: 10,
+  baseUrl: "http://127.0.0.1:8800",
+  wwwDir: "path to www dir, where static html files will be created.",
+  startUrl: "first url to start crawling.",
+};
+
+var help = false;
+for (var i = 0; i < args.length; i++) {
   var key, val;
   if (args[i].indexOf("-") === 0) {
     key = args[i].replace(/(^-+)/, "");
     if (key === "console") {
       options[key] = true;
+    } else if (key === "help") {
+      help = true
     } else {
       val = args[++i];
       if (key === "concurrency") val = parseInt(val);
@@ -26,13 +36,6 @@ if (options["concurrency"] && options["concurrency"] > 10)
     options[v] = (str.substr(-1) === '/') ? str.substr(0, str.length - 1) : str;
   }
 });
-
-var startUrl = options["startUrl"];
-var baseUrl = options["baseUrl"];
-if (startUrl.indexOf(baseUrl) !== 0) {
-  startUrl = baseUrl + startUrl;
-  delete options["startUrl"];
-}
 
 var Builder = (function(){
   var workerIdSeq = 0;
@@ -161,7 +164,7 @@ var Builder = (function(){
     var self = this;
     self.logPrefix = "[builder]";
     self.options = {
-      concurrency: 30,
+      concurrency: 10,
       baseUrl: "http://127.0.0.1:8800",
       wwwDir: fs.workingDirectory + "/../www",
     };
@@ -238,11 +241,25 @@ var Builder = (function(){
   return Builder;
 })();
 
-var builder = new Builder(options);
-builder.start(startUrl, wwwDir + "/start.html", function(){
-  setTimeout(function(){
-    console.log("[main] done");
-    phantom.exit();
-  }, 50);
-});
+if (help) {
+  console.log("Usage:")
+  for (var k in options) {
+    console.log("  --" + k + ":", options[k]);
+  }
+  phantom.exit();
+} else {
+  var startUrl = options["startUrl"];
+  var baseUrl = options["baseUrl"];
+  if (startUrl.indexOf(baseUrl) !== 0) {
+    startUrl = baseUrl + startUrl;
+    delete options["startUrl"];
+  }
 
+  var builder = new Builder(options);
+  builder.start(startUrl, options["wwwDir"] + "/start.html", function(){
+    setTimeout(function(){
+      console.log("[main] done");
+      phantom.exit();
+    }, 50);
+});
+}
