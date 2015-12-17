@@ -14,21 +14,22 @@ module.exports = function (grunt) {
     concat: {
       options: {
         process: function(src, filepath) {
-          function removeLine(text, str) {
-            var r = new RegExp("(^|\\n)[^\\n]+(" + str + ")[^\\n]*(\\n)", "g");
-            while (true) {
-              var tmp = text.replace(r, "$1");
-              if (tmp === text) return text;
-              text = tmp;
+          //src = src.replace(new RegExp("\\n+"), "\n");
+          var lines = src.split("\n");
+          var cnt = 0;
+          while (true) {
+            var l = lines.shift();
+            if (l === "// -- BEGIN --" || ++cnt > 100) {
+              break;
             }
           }
-          src = removeLine(src, "console.time\\(");
-          src = removeLine(src, "console.debug\\(");
-          src = removeLine(src, "console.log\\(");
-          src = removeLine(src, "//\\s*dev");
-          var filename = (filepath.indexOf('__') >= 0) ? '' :
-            ('// Source: ' + filepath + '\n');
-          return filename + src;
+          var resultLines = [];
+          lines.forEach(function(v){
+            if (v.match(/^\s*\/\//)) return;
+            if (v.match(/console\./)) return;
+            resultLines.push(v);
+          });
+          return resultLines.join("\n");
         },
       },
       dist: {

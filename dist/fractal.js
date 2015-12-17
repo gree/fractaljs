@@ -1,8 +1,33 @@
-// Source: src/fractal.js
+
+if (!Function.prototype.bind) {
+  Function.prototype.bind = function(oThis) {
+    if (typeof this !== 'function') {
+      throw new TypeError('Function.prototype.bind - what is trying to be bound is not callable');
+    }
+
+    var aArgs   = Array.prototype.slice.call(arguments, 1),
+    fToBind = this,
+    fNOP    = function() {},
+    fBound  = function() {
+      return fToBind.apply(this instanceof fNOP
+                           ? this
+                           : oThis,
+                           aArgs.concat(Array.prototype.slice.call(arguments)));
+    };
+
+    if (this.prototype) {
+      fNOP.prototype = this.prototype;
+    }
+    fBound.prototype = new fNOP();
+
+    return fBound;
+  };
+}
+
 (function(global){
+  var buildStatic = (window.navigator.userAgent === "fractaljs-site-builder");
   var COMPONENT_ATTR = "f-component";
 
-  // utils
   var setImmediate = (function() {
     var timeouts = [];
     var messageName = (new Date()).getTime();
@@ -55,15 +80,16 @@
   var Pubsub = (function(){
     var topics = {}, seq = 0;
     return {
-      publish: function(topic, data, from) {
+      publish: function(topic, data, publisher) {
         var subscribers = topics[topic];
-        for (var i in subscribers) subscribers[i].cb(topic, data, from);
+        for (var i in subscribers) subscribers[i].cb(topic, data, publisher);
       },
-      subscribe: function(topic, cb) {
+      subscribe: function(topic, subscriber, cb) {
         if (!topics[topic]) topics[topic] = [];
         var token = ++seq;
         topics[topic].push({
           token: token,
+          subscriber: subscriber,
           cb: cb
         });
         return token;
@@ -79,8 +105,13 @@
         }
         if (subscribers.length === 0) delete topics[topic];
       },
+      getSubscribers: function(topic) {
+        if (!(topic in topics)) return [];
+        return topics[topic].map(function(v){ return v.subscriber; });
+      },
     };
   })();
+
   var require = (function(){
     var cache = {}, asyncOnce = createAsyncOnce();
 
@@ -128,7 +159,6 @@
     var main = function(url, cb) {
       getMethod(url)(url, function(err, data) {
         if (err) {
-          console.error('Require error: ' + err);
         }
         cache[url] = data;
         cb(data);
@@ -147,13 +177,13 @@
       }
     };
   })();
+
   var Component = (function(){
     var Class = (function(){
       /* Simple JavaScript Inheritance
        * By John Resig http://ejohn.org/
        * MIT Licensed.
        */
-      // Inspired by base2 and Prototype
       var initializing = false, fnTest = /xyz/.test(function(){xyz;}) ? /\b_super\b/ : /.*/;
       var Class = function(){};
       Class.extend = function(prop) {
@@ -205,6 +235,7 @@
         self.$container = $container;
         self.f = f;
         self.id = idSeq++;
+        F.all[self.id] = self;
         self.$ = self.$container.find.bind(self.$container);
         self.rendered = false;
         self.subscribeList = {};
@@ -214,9 +245,6 @@
         if (self.resetDisplay) self.$container.css("display", self.resetDisplay);
         self.$container.on("destroyed", self.unload.bind(self));
 
-        // TODO implement if needed
-        // self.children = [];
-        // self.parent = null;
         if (typeof(self.template) === "string")
           self.template = self.f.compile(self.template);
       },
@@ -224,6 +252,12 @@
         var self = this;
         param = param || {};
 
+        if (buildStatic && self.alwaysRender) {
+          self.rendered = true;
+          if (cb) cb();
+          return;
+        }
+        self.rendered = false;
         self.getData(function(data, partials){
           self.getTemplate(function(template){
             self.render(data, partials, template, function() {
@@ -232,7 +266,9 @@
                 self.myselfLoaded(function(){
                   self.loadChildren(function(){
                     self.allLoaded(function(){
-                      console.timeEnd("Component." + self.name + self.id);
+                      if (buildStatic) {
+                        self.$container.removeAttr(COMPONENT_ATTR);
+                      }
                       if (cb) cb();
                     }, param);
                   }, param);
@@ -280,9 +316,6 @@
           self.f.requireComponent(componentClassName, function(constructor){
             var component = new constructor(componentClassName, $container, self.f);
             (function(component, cb){
-              // NOTE
-              //  this "setImmediate" looks like the fastest implementation ...
-              //  but there is still a several ms delay comparing to just calling "component.load"
               setImmediate(function(){
                 component.load(param, cb);
               });
@@ -293,12 +326,13 @@
       allLoaded: _noImpl,
       unload: function(){
         this.unsubscribe();
+        delete F.all[this.id];
       },
 
       publish: function(topic, data) { Pubsub.publish(topic, data, this); },
       subscribe: function(topic, cb){
         var self = this;
-        self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data, from){
+        self.subscribeList[topic] = Pubsub.subscribe(topic, self, function(topic, data, from){
           if (self.rendered) {
             cb(topic, data, from);
           } else {
@@ -343,9 +377,34 @@
       for (var i in options) self[i] = options[i];
       if (!self.sourceRoot)
         self.sourceRoot = location.pathname.split("/").slice(0, -1).join("/") + "/";
-
       self._classes = {};
     };
+
+    var realBuild = function($container, param, cb){
+      var self = this;
+      if (typeof($container) === "function") {
+        cb = $container;
+        $container = null;
+        param = null;
+      }
+      self.$root = $container || $(global.document);
+      var componentClassName = self.$root.attr(COMPONENT_ATTR);
+      if (componentClassName) {
+        self.requireComponent(componentClassName, function(constructor){
+          var c = new constructor(componentClassName, self.$root, self);
+          c.load(param, function(){
+            if (cb) cb();
+          });
+        });
+      } else {
+        var c = new Component("", self.$root, self);
+        c.loadChildren(function(){
+          c.rendered = true;
+          if (cb) cb();
+        });
+      }
+    };
+
     Fractal.prototype = {
       init: function(cb) {
         var self = this;
@@ -358,26 +417,6 @@
           };
           cb(self);
         });
-      },
-      build: function($container, param, cb){
-        var self = this;
-        self.$root = $container || $(global.document);
-        var componentClassName = self.$root.attr(COMPONENT_ATTR);
-        if (componentClassName) {
-          self.requireComponent(componentClassName, function(constructor){
-            var c = new constructor(componentClassName, self.$root, self);
-            c.load(param, function(){
-              console.timeEnd("f.build" + self.id);
-              if (cb) cb();
-            });
-          });
-        } else {
-          var c = new Component("", self.$root, self);
-          c.loadChildren(function(){
-            console.timeEnd("f.build" + self.id);
-            if (cb) cb();
-          });
-        }
       },
       resolve: function(name) {
         if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
@@ -451,7 +490,24 @@
       })(),
     };
 
+    var pendingBuilders = [];
+    if (buildStatic) {
+      Fractal.prototype._build = realBuild;
+      Fractal.prototype.build = function($container, param, cb) {
+        var self = this;
+        pendingBuilders.push(function(){
+          self._build($container, param, function(){
+            Pubsub.publish("f.build.done", self.id, self);
+            if (cb) cb();
+          });
+        });
+      };
+    } else {
+      Fractal.prototype.build = realBuild;
+    }
+
     global.F = {
+      all: {}, // contains all components
       Pubsub: Pubsub,
       ComponentBase: Component,
       component: function(name, object, base){
@@ -465,7 +521,13 @@
         var f = new Fractal(options);
         f.init(cb);
       },
+      buildStatic: function(){
+        pendingBuilders.forEach(function(v){
+          v();
+        });
+      }
     };
+
   })();
 
 })(window);

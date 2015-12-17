@@ -1,4 +1,41 @@
+// polyfill console
+if (!console.debug) console.debug = console.log;
+if (!console.time) console.time = function(){};
+if (!console.timeEnd) console.timeEnd = function(){};
+
+// -- BEGIN --
+
+// polyfill bind
+if (!Function.prototype.bind) {
+  Function.prototype.bind = function(oThis) {
+    if (typeof this !== 'function') {
+      // closest thing possible to the ECMAScript 5
+      // internal IsCallable function
+      throw new TypeError('Function.prototype.bind - what is trying to be bound is not callable');
+    }
+
+    var aArgs   = Array.prototype.slice.call(arguments, 1),
+    fToBind = this,
+    fNOP    = function() {},
+    fBound  = function() {
+      return fToBind.apply(this instanceof fNOP
+                           ? this
+                           : oThis,
+                           aArgs.concat(Array.prototype.slice.call(arguments)));
+    };
+
+    if (this.prototype) {
+      // native functions don't have a prototype
+      fNOP.prototype = this.prototype;
+    }
+    fBound.prototype = new fNOP();
+
+    return fBound;
+  };
+}
+
 (function(global){
+  var buildStatic = (window.navigator.userAgent === "fractaljs-site-builder");
   var COMPONENT_ATTR = "f-component";
 
   // utils
@@ -54,16 +91,17 @@
   var Pubsub = (function(){
     var topics = {}, seq = 0;
     return {
-      publish: function(topic, data, from) {
+      publish: function(topic, data, publisher) {
         var subscribers = topics[topic];
-        for (var i in subscribers) subscribers[i].cb(topic, data, from);
+        for (var i in subscribers) subscribers[i].cb(topic, data, publisher);
       },
-      subscribe: function(topic, cb) {
+      subscribe: function(topic, subscriber, cb) {
         console.debug("subscribe", topic);
         if (!topics[topic]) topics[topic] = [];
         var token = ++seq;
         topics[topic].push({
           token: token,
+          subscriber: subscriber,
           cb: cb
         });
         return token;
@@ -80,8 +118,13 @@
         }
         if (subscribers.length === 0) delete topics[topic];
       },
+      getSubscribers: function(topic) {
+        if (!(topic in topics)) return [];
+        return topics[topic].map(function(v){ return v.subscriber; });
+      },
     };
   })();
+
   var require = (function(){
     var cache = {}, asyncOnce = createAsyncOnce();
 
@@ -127,7 +170,7 @@
     var getMethod = function(name) { return _methods[name.split(".").pop()] || _methods.ajax; };
 
     var main = function(url, cb) {
-      console.log("network require", url)
+      console.debug("network require", url)
       getMethod(url)(url, function(err, data) {
         if (err) {
           console.error('Require error: ' + err);
@@ -149,6 +192,7 @@
       }
     };
   })();
+
   var Component = (function(){
     var Class = (function(){
       /* Simple JavaScript Inheritance
@@ -207,6 +251,7 @@
         self.$container = $container;
         self.f = f;
         self.id = idSeq++;
+        F.all[self.id] = self;
         self.$ = self.$container.find.bind(self.$container);
         self.rendered = false;
         self.subscribeList = {};
@@ -227,6 +272,12 @@
         console.time("Component." + self.name + self.id);
         param = param || {};
 
+        if (buildStatic && self.alwaysRender) {
+          self.rendered = true;
+          if (cb) cb();
+          return;
+        }
+        self.rendered = false;
         self.getData(function(data, partials){
           self.getTemplate(function(template){
             self.render(data, partials, template, function() {
@@ -236,6 +287,9 @@
                   self.loadChildren(function(){
                     self.allLoaded(function(){
                       console.timeEnd("Component." + self.name + self.id);
+                      if (buildStatic) {
+                        self.$container.removeAttr(COMPONENT_ATTR);
+                      }
                       if (cb) cb();
                     }, param);
                   }, param);
@@ -297,12 +351,13 @@
       unload: function(){
         console.debug("unload called", this.name);
         this.unsubscribe();
+        delete F.all[this.id];
       },
 
       publish: function(topic, data) { Pubsub.publish(topic, data, this); },
       subscribe: function(topic, cb){
         var self = this;
-        self.subscribeList[topic] = Pubsub.subscribe(topic, function(topic, data, from){
+        self.subscribeList[topic] = Pubsub.subscribe(topic, self, function(topic, data, from){
           if (self.rendered) {
             cb(topic, data, from);
           } else {
@@ -344,14 +399,41 @@
       var self = this;
       options = options || {};
       self.id = ++idSeq;
-      console.time("f.build" + self.id);
       for (var i in defaults) self[i] = defaults[i];
       for (var i in options) self[i] = options[i];
       if (!self.sourceRoot)
         self.sourceRoot = location.pathname.split("/").slice(0, -1).join("/") + "/";
-
       self._classes = {};
     };
+
+    var realBuild = function($container, param, cb){
+      var self = this;
+      console.time("f.build." + self.id);
+      if (typeof($container) === "function") {
+        cb = $container;
+        $container = null;
+        param = null;
+      }
+      self.$root = $container || $(global.document);
+      var componentClassName = self.$root.attr(COMPONENT_ATTR);
+      if (componentClassName) {
+        self.requireComponent(componentClassName, function(constructor){
+          var c = new constructor(componentClassName, self.$root, self);
+          c.load(param, function(){
+            console.timeEnd("f.build." + self.id);
+            if (cb) cb();
+          });
+        });
+      } else {
+        var c = new Component("", self.$root, self);
+        c.loadChildren(function(){
+          c.rendered = true;
+          console.timeEnd("f.build" + self.id);
+          if (cb) cb();
+        });
+      }
+    };
+
     Fractal.prototype = {
       init: function(cb) {
         var self = this;
@@ -364,26 +446,6 @@
           };
           cb(self);
         });
-      },
-      build: function($container, param, cb){
-        var self = this;
-        self.$root = $container || $(global.document);
-        var componentClassName = self.$root.attr(COMPONENT_ATTR);
-        if (componentClassName) {
-          self.requireComponent(componentClassName, function(constructor){
-            var c = new constructor(componentClassName, self.$root, self);
-            c.load(param, function(){
-              console.timeEnd("f.build" + self.id);
-              if (cb) cb();
-            });
-          });
-        } else {
-          var c = new Component("", self.$root, self);
-          c.loadChildren(function(){
-            console.timeEnd("f.build" + self.id);
-            if (cb) cb();
-          });
-        }
       },
       resolve: function(name) {
         if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
@@ -459,7 +521,24 @@
       })(),
     };
 
+    var pendingBuilders = [];
+    if (buildStatic) {
+      Fractal.prototype._build = realBuild;
+      Fractal.prototype.build = function($container, param, cb) {
+        var self = this;
+        pendingBuilders.push(function(){
+          self._build($container, param, function(){
+            Pubsub.publish("f.build.done", self.id, self);
+            if (cb) cb();
+          });
+        });
+      };
+    } else {
+      Fractal.prototype.build = realBuild;
+    }
+
     global.F = {
+      all: {}, // contains all components
       Pubsub: Pubsub,
       ComponentBase: Component,
       component: function(name, object, base){
@@ -473,7 +552,13 @@
         var f = new Fractal(options);
         f.init(cb);
       },
+      buildStatic: function(){
+        pendingBuilders.forEach(function(v){
+          v();
+        });
+      }
     };
+
   })();
 
 })(window);

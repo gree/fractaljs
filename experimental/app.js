@@ -22,11 +22,16 @@
 
   var encodeParam = app.encodeParam = function(data) {
     var kvp = [];
+    var page = "";
     for (var i in data) {
-      if (i === PageKey) continue;
-      kvp.push([i, data[i]])
+      if (i === PageKey) {
+        page = data[i];
+      } else {
+        kvp.push([i, data[i]])
+      }
     }
-    return kvp.map(function(v){
+    var prefix = page ? page + "&" : "";
+    return prefix + kvp.map(function(v){
       return encodeURIComponent(v[0]) + "=" + encodeURIComponent(v[1]);
     }).join("&");
   };
@@ -81,25 +86,31 @@
   })();
 
   app.Router = F.ComponentBase.extend({
-    getDefaultName: function() { throw new Error("to be extended"); },
-    getComponentName: function(changedQuery, callback) { throw new Error("to be extended"); },
     template: '{{#name}}<div f-component="{{name}}" />{{/name}}',
     init: function(name, $container, f) {
       var self = this;
       self._super(name, $container, f);
-      self.componentName = self.getDefaultName();
+      if (!self.DefaultComponent) {
+        throw new Error("DefaultComponent is not defined in subclass")
+      }
+      self.componentName = app.query.page || self.DefaultComponent;
       self.subscribe("app.query.changed", function(topic, data){
-        console.debug("received", self.name, topic, data);
-        self.getComponentName(data, function(componentName){
-          if (componentName && self.componentName !== componentName) {
-            self.componentName = componentName;
-            self.load();
-          }
-        });
+        console.debug("received", topic, self.name, data, app.query.page);
+        componentName = data.page ? (app.query.page || self.DefaultComponent) : "";
+        console.debug("componentName:", componentName,
+                      "self.componentName:", self.componentName);
+        if (componentName && self.componentName !== componentName) {
+          self.componentName = componentName;
+          self.load();
+        }
       });
     },
     getData: function(callback) {
       callback({name: this.componentName});
+    },
+    allLoaded: function(callback) {
+      this.publish(this.name + ".loaded");
+      callback();
     }
   });
 
@@ -113,5 +124,5 @@
     else return "www";
   })();
 
-})()
+})();
 
