@@ -180,8 +180,8 @@ if (!Function.prototype.bind) {
       });
     };
 
-    return function(url, cb) {
-      if (url in cache) {
+    return function(url, cb, forceUpdate) {
+      if (url in cache && !forceUpdate) {
         cb(cache[url]);
       } else {
         asyncOnce(url, function(cb){
@@ -386,8 +386,8 @@ if (!Function.prototype.bind) {
     TMPL_EXT = "tmpl",
     idSeq = 0,
     defaults = {
-      prefixComponent: "/",
-      prefixTemplate: "/",
+      prefixComponent: "",
+      prefixTemplate: "",
       requireList: [],
       domParser: protocol + "//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js",
       templateEngine: protocol + "//cdnjs.cloudflare.com/ajax/libs/hogan.js/3.0.0/hogan.js",
@@ -448,7 +448,7 @@ if (!Function.prototype.bind) {
         });
       },
       resolve: function(name) {
-        if (name.indexOf("http") === 0 || name.indexOf("//") === 0) return name;
+        if (name.indexOf("http") === 0 || name.indexOf("/") === 0) return name;
         return this.sourceRoot + ((name.indexOf("/") === 0) ? name.slice(1) : name);
       },
       require: function(names, cb){
@@ -540,6 +540,7 @@ if (!Function.prototype.bind) {
     global.F = {
       all: {}, // contains all components
       Pubsub: Pubsub,
+      Require: require,
       ComponentBase: Component,
       component: function(name, object, base){
         currentInstance.defineComponent(name, object, base);
