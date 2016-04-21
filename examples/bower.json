@@ -1,0 +1,25 @@
+{
+  "name": "examples",
+  "main": "index.js",
+  "homepage": "https://github.com/lulurun/fractaljs",
+  "authors": [
+    "Xiaolu Liu <xiaolu.liu@gree.co.jp>"
+  ],
+  "description": "",
+  "moduleType": [],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "devDependencies": {
+    "jquery": "^2.2.3",
+    "bootstrap": "^3.3.6",
+    "marked": "^0.3.5",
+    "databind": "^0.4.1",
+    "mustache.js": "mustache#^2.2.1"
+  }
+}

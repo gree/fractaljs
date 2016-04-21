@@ -1,10 +1,16 @@
 {
   "name": "FractalJS",
-  "version": "1.3.2",
-  "description": "A Front-end Javascript Library to Help Breaking a Large Web Application into Small Parts and Organize Them Together.",
+  "version": "2.0.0",
+  "description": "Simple javascript framework for building component-based Web UI",
   "main": "src/fractal.js",
+  "keywords": [
+    "component",
+    "es2015",
+    "es6",
+    "framework"
+  ],
+  "author": "lulurun@gmail.com",
   "license": "MIT",
-  "homepage": "http://gree.github.io/fractaljs/",
-  "ignore": ["docs", "examples", "test", "*.md", "*.html"],
-  "keywords": ["framework", "component", "fractal"]
+  "homepage": "https://github.com/gree/fractaljs",
+  "ignore": ["docs", "examples", "test", "*.md", "*.html"]
 }

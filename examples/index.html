@@ -1,18 +1,11 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>FractalJS App</title>
-  </head>
   <body>
+    <div f-component="list"></div>
     <div f-component="main"></div>
 
-    <script type="text/javascript" src="../dist/fractal.js"></script>
-    <script type="text/javascript" src="../experimental/app.js"></script>
-    <script type="text/javascript">
-      F.createInstance(function(f){
-        f.build();
-      });
-    </script>
+    <script src="../dist/fractal.js"></script>
+    <script src="../dist/fractal-router.js"></script>
+    <script src="bundle.js"></script>
   </body>
 </html>
-
