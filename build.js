@@ -7,7 +7,7 @@ var plugins = [
 ];
 
 rollup.rollup({
-  entry: 'src/index.js',
+  input: 'src/index.js',
   plugins: plugins,
 }).then(function (bundle) {
   ['umd'].forEach(v => {
@@ -15,30 +15,11 @@ rollup.rollup({
     console.log(file);
     bundle.write({
       format: v,
-      dest: file,
-      moduleName: "F",
-      sourceMap: true,
+      file: file,
+      name: "F",
+      sourcemap: true,
     });
   });
 }).catch(function(e) {
   console.log("Build error:", e);
 });
-
-rollup.rollup({
-  entry: 'src/router.js',
-  plugins: plugins,
-}).then(function (bundle) {
-  ['umd'].forEach(v => {
-    var file = 'dist/fractal-router.js';
-    console.log(file);
-    bundle.write({
-      format: v,
-      dest: file,
-      moduleName: "F.Router",
-      sourceMap: true,
-    });
-  });
-}).catch(function(e) {
-  console.log("Build error:", e);
-});
-

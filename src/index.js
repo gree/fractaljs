@@ -1,31 +1,28 @@
-import {defineComponent, build} from './component'
-import Config from './config'
+import {Component, build, registerComponent} from './component'
+import Pubsub from './pubsub'
 
-export default {
-  init: function(templateEngine, dynamicRequire, pubsub) {
-    // template engine
-    if (templateEngine) {
-      if (templateEngine.compile)
-        Config.compile = templateEngine.compile;
-      Config.render = templateEngine.render;
+function createComponent(name, def) {
+  registerComponent(name, class extends Component {
+    constructor(name, el, parent) {
+      super(name, el, parent);
+      if (def.template) {
+        this.template = def.template;
+      }
+      if (def.init) {
+        def.init.bind(this)();
+      }
+      if (def.getData) {
+        this.getData = def.getData.bind(this);
+      }
+      if (def.rendered) {
+        this.rendered = def.rendered.bind(this);
+      }
     }
-    // dynamic require
-    if (dynamicRequire) {
-      ['component', 'template'].forEach(v => {
-        if (v in dynamicRequire)
-          Config.dynamicRequire[v] = dynamicRequire[v];
-      });
-    }
-    // pubsub
-    if (pubsub) {
-      ['publish', 'subscribe', 'unsubscribe'].forEach(v => {
-        if (v in pubsub)
-          Config.Pubsub[v] = pubsub[v];
-      });
-    }
-  },
-  build: build,
-  Pubsub: Config.Pubsub,
-  component: defineComponent,
+  });
 }
 
+export default {
+  build: build,
+  component: createComponent,
+  publish: Pubsub.publish
+}
