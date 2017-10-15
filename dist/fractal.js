@@ -264,7 +264,10 @@ var Component = function () {
       var _this = this;
 
       var els = this.el.querySelectorAll('[' + COMPONENT_ATTR + ']');
-      if (!els || !els.length) return cb();
+      if (!els || !els.length) {
+        if (cb) cb();
+        return;
+      }
 
       var len = els.length;
       var nbComplete = 0;
@@ -275,7 +278,9 @@ var Component = function () {
         var c = new Class(name, el, _this);
         _this.children.push(c);
         c.load(param, function () {
-          if (++nbComplete === len) cb();
+          if (++nbComplete === len) {
+            if (cb) cb();
+          }
         });
       });
     }
@@ -383,10 +388,13 @@ function createComponent(name, def) {
   }(Component));
 }
 
+window.onpopstate = function () {
+  Pubsub.publish("onpopstate", location.hash);
+};
+
 var index = {
   build: build,
-  component: createComponent,
-  publish: Pubsub.publish
+  component: createComponent
 };
 
 return index;

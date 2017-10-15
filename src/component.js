@@ -1,7 +1,6 @@
 import Pubsub from './pubsub'
 
 const COMPONENT_ATTR = 'f-component'
-const RENDERED_ATTR = 'f-rendered'
 const knownComponents = {}
 
 export class Component {
@@ -28,8 +27,10 @@ export class Component {
 
   loadChildren(cb, param) {
     const els = this.el.querySelectorAll('[' + COMPONENT_ATTR + ']');
-    if (!els || !els.length)
-      return cb();
+    if (!els || !els.length) {
+      if (cb) cb();
+      return;
+    }
 
     const len = els.length;
     let nbComplete = 0;
@@ -40,8 +41,9 @@ export class Component {
       const c = new Class(name, el, this);
       this.children.push(c);
       c.load(param, () => {
-        if (++nbComplete === len)
-          cb();
+        if (++nbComplete === len) {
+          if (cb) cb();
+        }
       });
     });
   }

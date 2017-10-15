@@ -12,7 +12,7 @@ module.exports = {
   plugins: [
     new CleanWebpackPlugin([distDir]),
     new HtmlWebpackPlugin({
-      title: 'FractalJS Example',
+      title: 'FractalJS with OnsenUI',
       template: 'index.html',
     }),
     new webpack.optimize.CommonsChunkPlugin({

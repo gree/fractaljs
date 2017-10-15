@@ -18,11 +18,7 @@ F.component('router', {
   },
   getData: function(cb) {
     cb({
-      name: this.current || this.getDefaultComponent()
+      name: this.current || 'button'
     });
   }
 });
-
-window.onpopstate = function () {
-  F.publish("onpopstate", location.hash);
-};

@@ -1,0 +1,116 @@
+<ons-page>
+  <div class="profile-pic">
+    <img src="https://monaca.io/img/logos/download_image_onsenui_01.png">
+  </div>
+
+  <ons-list-title>Access</ons-list-title>
+  <ons-list>
+    <ons-list-item onclick="fn.loadView(0)">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-home, material:md-home"></ons-icon>
+      </div>
+      <div class="center">
+        Home
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-link"></ons-icon>
+      </div>
+    </ons-list-item>
+    <ons-list-item onclick="fn.loadView(1)">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-edit, material:md-edit"></ons-icon>
+      </div>
+      <div class="center">
+        Forms
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-link"></ons-icon>
+      </div>
+    </ons-list-item>
+    <ons-list-item onclick="fn.loadView(2)">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-film-marker, material: md-movie-alt"></ons-icon>
+      </div>
+      <div class="center">
+        Animations
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-link"></ons-icon>
+      </div>
+    </ons-list-item>
+  </ons-list>
+
+  <ons-list-title style="margin-top: 10px">Links</ons-list-title>
+  <ons-list>
+    <ons-list-item onclick="fn.loadLink('https://onsen.io/v2/docs/guide/js/')">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-document-text"></ons-icon>
+      </div>
+      <div class="center">
+        Docs
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-external-link"></ons-icon>
+      </div>
+    </ons-list-item>
+    <ons-list-item onclick="fn.loadLink('https://github.com/OnsenUI/OnsenUI')">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-social-github"></ons-icon>
+      </div>
+      <div class="center">
+        GitHub
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-external-link"></ons-icon>
+      </div>
+    </ons-list-item>
+    <ons-list-item onclick="fn.loadLink('https://community.onsen.io/')">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-chatboxes"></ons-icon>
+      </div>
+      <div class="center">
+        Forum
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-external-link"></ons-icon>
+      </div>
+    </ons-list-item>
+    <ons-list-item onclick="fn.loadLink('https://twitter.com/Onsen_UI')">
+      <div class="left">
+        <ons-icon fixed-width class="list-item__icon" icon="ion-social-twitter"></ons-icon>
+      </div>
+      <div class="center">
+        Twitter
+      </div>
+      <div class="right">
+        <ons-icon icon="fa-external-link"></ons-icon>
+      </div>
+    </ons-list-item>
+  </ons-list>
+
+  <script>
+    ons.getScriptPage().onInit = function() {
+      // Set ons-splitter-side animation
+      this.parentElement.setAttribute('animation', ons.platform.isAndroid() ? 'overlay' : 'reveal');
+    };
+  </script>
+
+  <style>
+    .profile-pic {
+      width: 200px;
+      background-color: #fff;
+      margin: 20px auto 10px;
+      border: 1px solid #999;
+      border-radius: 4px;
+    }
+
+    .profile-pic > img {
+      display: block;
+      max-width: 100%;
+    }
+
+    ons-list-item {
+      color: #444;
+    }
+  </style>
+</ons-page>

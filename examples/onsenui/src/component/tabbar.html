@@ -1,0 +1,29 @@
+<ons-page id="appTabbarPage">
+  <ons-toolbar>
+    <div class="center">Home</div>
+    <div class="right">
+      <ons-toolbar-button id="appTabbarBtn">
+        <ons-icon icon="ion-navicon, material:md-menu"></ons-icon>
+      </ons-toolbar-button>
+    </div>
+  </ons-toolbar>
+
+  <ons-tabbar id="appTabbar" swipeables position="auto">
+    <ons-tab label="Home" page="home.html" icon="ion-home" active></ons-tab>
+    <ons-tab label="Forms" page="forms.html" icon="ion-edit"></ons-tab>
+    <ons-tab label="Animations" page="animations.html" icon="ion-film-marker"></ons-tab>
+  </ons-tabbar>
+
+</ons-page>
+
+<template id="home.html">
+  <ons-page f-component="home"></ons-page>
+</template>
+
+<template id="forms.html">
+  <ons-page f-component="forms"></ons-page>
+</template>
+
+<template id="animations.html">
+  <ons-page f-component="animations"></ons-page>
+</template>

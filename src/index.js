@@ -21,8 +21,11 @@ function createComponent(name, def) {
   });
 }
 
+window.onpopstate = function () {
+  Pubsub.publish("onpopstate", location.hash);
+};
+
 export default {
   build: build,
   component: createComponent,
-  publish: Pubsub.publish
 }
