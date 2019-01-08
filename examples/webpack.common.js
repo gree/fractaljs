@@ -15,12 +15,20 @@ module.exports = {
       title: 'FractalJS Example',
       template: 'index.html',
     }),
-    new webpack.optimize.CommonsChunkPlugin({
-      name: 'common'
-    })
   ],
+  optimization: {
+    runtimeChunk: "single",
+    splitChunks: {
+      cacheGroups: {
+        vendor: {
+          name: "common",
+          chunks: "all"
+        }
+      }
+    }
+  },
   module: {
-    loaders: [
+    rules: [
       {
         test: /\.js$/,
         exclude: /(node_modules|bower_components)/,
