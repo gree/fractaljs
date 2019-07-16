@@ -22,7 +22,7 @@
     "babel-core": "^6.26.3",
     "babel-loader": "^7.1.2",
     "babel-preset-es2015-rollup": "^3.0.0",
-    "lodash": "^4.17.11",
+    "lodash": "^4.17.14",
     "rollup": "^0.50.0",
     "rollup-plugin-babel": "^3.0.2"
   }
